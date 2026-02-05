@@ -956,7 +956,6 @@ class StarTrekGame {
         saucerGroup.add(phaser);
 
         this.addSaucerWindows(saucerGroup, saucerRadius, windowMaterial);
-        this.addRegistryText(saucerGroup);
 
         saucerGroup.position.z = -14;
         this.enterprise.add(saucerGroup);
@@ -1661,6 +1660,31 @@ class StarTrekGame {
         this.hullBreaches.push(breachGroup);
     }
 
+    showShieldHitEffect() {
+        // Make shield brightly visible
+        this.shieldMesh.material.opacity = 0.6;
+        this.shieldMesh.material.color.setHex(0x66ddff);
+
+        // Animate shield fade out
+        let opacity = 0.6;
+        const fadeInterval = setInterval(() => {
+            opacity -= 0.05;
+            if (opacity <= 0) {
+                opacity = 0;
+                this.shieldMesh.material.opacity = 0;
+                this.shieldMesh.material.color.setHex(0x44aaff);
+                clearInterval(fadeInterval);
+            } else {
+                this.shieldMesh.material.opacity = opacity;
+                // Shift color from bright cyan to normal blue as it fades
+                const r = Math.floor(0x44 + (0x66 - 0x44) * (opacity / 0.6));
+                const g = Math.floor(0xaa + (0xdd - 0xaa) * (opacity / 0.6));
+                const b = 0xff;
+                this.shieldMesh.material.color.setRGB(r/255, g/255, b/255);
+            }
+        }, 30);
+    }
+
     updateHullBreaches(deltaTime) {
         this.hullBreaches = this.hullBreaches.filter(breach => {
             breach.userData.life -= deltaTime;
@@ -2209,8 +2233,8 @@ class StarTrekGame {
             this.stats.shields -= absorbedByShields;
             amount -= absorbedByShields;
 
-            this.shieldMesh.material.opacity = 0.3;
-            setTimeout(() => this.shieldMesh.material.opacity = 0, 200);
+            // Dramatic shield flash effect
+            this.showShieldHitEffect();
             this.playShieldHitSound();
 
             // Check shield status for crew dialog
