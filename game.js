@@ -988,138 +988,155 @@ class StarTrekGame {
     createEnterprise() {
         this.enterprise = new THREE.Group();
 
+        // Premium materials for sleek look
         const hullMaterial = new THREE.MeshStandardMaterial({
-            color: 0xe8e8e8, metalness: 0.3, roughness: 0.4
+            color: 0xf0f0f0, metalness: 0.4, roughness: 0.25
         });
         const hullMaterialDark = new THREE.MeshStandardMaterial({
-            color: 0x888899, metalness: 0.4, roughness: 0.3
+            color: 0x8899aa, metalness: 0.5, roughness: 0.2
         });
-        const panelMaterial = new THREE.MeshStandardMaterial({
-            color: 0xaaaaaa, metalness: 0.5, roughness: 0.3
+        const accentMaterial = new THREE.MeshStandardMaterial({
+            color: 0xccccdd, metalness: 0.6, roughness: 0.15
         });
         const bussardMaterial = new THREE.MeshStandardMaterial({
-            color: 0xdd4444, metalness: 0.6, roughness: 0.2,
-            emissive: 0x661111, emissiveIntensity: 0.5
+            color: 0xff4444, metalness: 0.7, roughness: 0.1,
+            emissive: 0xff2200, emissiveIntensity: 0.6
         });
         const warpGlowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x44aaff, transparent: true, opacity: 0.9
+            color: 0x66ccff, transparent: true, opacity: 0.95
         });
         const deflectorMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ccff, transparent: true, opacity: 0.85
+            color: 0x00ddff, transparent: true, opacity: 0.9
         });
         const windowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffdd, transparent: true, opacity: 0.9
+            color: 0xffffee, transparent: true, opacity: 0.95
         });
 
-        // SAUCER - THINNER
+        // ========== SAUCER SECTION - Sleek disc ==========
         const saucerGroup = new THREE.Group();
-        const saucerRadius = 18;
-        const saucerShape = new THREE.Shape();
-        saucerShape.absarc(0, 0, saucerRadius, 0, Math.PI * 2, false);
+        const saucerRadius = 20;
 
-        const saucerExtrudeSettings = {
-            steps: 1, depth: 1.4, bevelEnabled: true,
-            bevelThickness: 0.5, bevelSize: 0.4, bevelSegments: 8
-        };
+        // Main saucer - smooth lathe geometry for sleek profile
+        const saucerPoints = [];
+        for (let i = 0; i <= 32; i++) {
+            const t = i / 32;
+            const x = t * saucerRadius;
+            // Elegant curved profile - thin at edges, subtle dome
+            let y;
+            if (t < 0.85) {
+                y = Math.sqrt(1 - Math.pow(t / 0.92, 2)) * 1.8;
+            } else {
+                y = (1 - t) / 0.15 * 0.4;
+            }
+            saucerPoints.push(new THREE.Vector2(x, y));
+        }
+        // Add bottom curve
+        for (let i = 31; i >= 0; i--) {
+            const t = i / 32;
+            const x = t * saucerRadius;
+            let y;
+            if (t < 0.85) {
+                y = -Math.sqrt(1 - Math.pow(t / 0.92, 2)) * 1.2;
+            } else {
+                y = -(1 - t) / 0.15 * 0.3;
+            }
+            saucerPoints.push(new THREE.Vector2(x, y));
+        }
 
-        const saucerGeom = new THREE.ExtrudeGeometry(saucerShape, saucerExtrudeSettings);
-        saucerGeom.rotateX(Math.PI / 2);
-        saucerGeom.translate(0, -0.3, 0);
+        const saucerGeom = new THREE.LatheGeometry(saucerPoints, 64);
         const saucer = new THREE.Mesh(saucerGeom, hullMaterial);
         saucerGroup.add(saucer);
 
-        // Upper dome - flatter
-        const upperDomeGeom = new THREE.SphereGeometry(saucerRadius, 64, 32, 0, Math.PI * 2, 0, Math.PI / 12);
-        const upperDome = new THREE.Mesh(upperDomeGeom, hullMaterial);
-        upperDome.position.y = 0.8;
-        saucerGroup.add(upperDome);
-
-        // Lower curve - subtle
-        const lowerDomeGeom = new THREE.SphereGeometry(saucerRadius, 64, 32, 0, Math.PI * 2, Math.PI - Math.PI / 14, Math.PI / 14);
-        const lowerDome = new THREE.Mesh(lowerDomeGeom, hullMaterial);
-        lowerDome.position.y = -0.6;
-        saucerGroup.add(lowerDome);
-
-        // Saucer rim
-        const rimGeom = new THREE.TorusGeometry(saucerRadius, 0.35, 16, 64);
-        const rim = new THREE.Mesh(rimGeom, panelMaterial);
+        // Subtle rim accent
+        const rimGeom = new THREE.TorusGeometry(saucerRadius - 0.5, 0.15, 8, 64);
+        const rim = new THREE.Mesh(rimGeom, accentMaterial);
         rim.rotation.x = Math.PI / 2;
         saucerGroup.add(rim);
 
-        // Bridge - compact
+        // Bridge module - sleek stepped design
         const bridgeGroup = new THREE.Group();
-        const bridgeBaseGeom = new THREE.CylinderGeometry(4, 5, 1, 32);
-        const bridgeBase = new THREE.Mesh(bridgeBaseGeom, hullMaterial);
-        bridgeBase.position.y = 1.3;
-        bridgeGroup.add(bridgeBase);
 
-        const bridgeDomeGeom = new THREE.SphereGeometry(3.5, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+        // Bridge base - wider, flatter
+        const bridgeBase1Geom = new THREE.CylinderGeometry(5.5, 6.5, 0.6, 32);
+        const bridgeBase1 = new THREE.Mesh(bridgeBase1Geom, hullMaterial);
+        bridgeBase1.position.y = 2.0;
+        bridgeGroup.add(bridgeBase1);
+
+        const bridgeBase2Geom = new THREE.CylinderGeometry(4.2, 5.2, 0.5, 32);
+        const bridgeBase2 = new THREE.Mesh(bridgeBase2Geom, hullMaterial);
+        bridgeBase2.position.y = 2.5;
+        bridgeGroup.add(bridgeBase2);
+
+        // Bridge dome - smooth
+        const bridgeDomeGeom = new THREE.SphereGeometry(3.8, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2.5);
         const bridgeDome = new THREE.Mesh(bridgeDomeGeom, hullMaterial);
-        bridgeDome.position.y = 1.8;
+        bridgeDome.position.y = 2.7;
         bridgeGroup.add(bridgeDome);
 
-        const sensorDomeGeom = new THREE.SphereGeometry(1.5, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-        const sensorDome = new THREE.Mesh(sensorDomeGeom, hullMaterialDark);
-        sensorDome.position.y = 4.5;
-        bridgeGroup.add(sensorDome);
-
-        const bridgeWindowGeom = new THREE.TorusGeometry(3.2, 0.2, 8, 48);
+        // Bridge windows - sleek band
+        const bridgeWindowGeom = new THREE.TorusGeometry(3.6, 0.12, 8, 48);
         const bridgeWindow = new THREE.Mesh(bridgeWindowGeom, windowMaterial);
         bridgeWindow.rotation.x = Math.PI / 2;
-        bridgeWindow.position.y = 2.8;
+        bridgeWindow.position.y = 3.4;
         bridgeGroup.add(bridgeWindow);
 
         saucerGroup.add(bridgeGroup);
 
-        // Impulse engines
-        const impulseHousingGeom = new THREE.BoxGeometry(6, 1.8, 1.5);
+        // Impulse engines - integrated design
+        const impulseHousingGeom = new THREE.BoxGeometry(5, 1.2, 1.8);
+        impulseHousingGeom.translate(0, 0, 0);
         const impulseHousing = new THREE.Mesh(impulseHousingGeom, hullMaterialDark);
-        impulseHousing.position.set(0, 0.3, saucerRadius - 1);
+        impulseHousing.position.set(0, 0, saucerRadius - 2);
         saucerGroup.add(impulseHousing);
 
+        // Impulse vents - glowing
         for (let i = -1; i <= 1; i++) {
-            const ventGeom = new THREE.PlaneGeometry(1.5, 1.2);
+            const ventGeom = new THREE.PlaneGeometry(1.2, 0.8);
             const vent = new THREE.Mesh(ventGeom, new THREE.MeshBasicMaterial({
-                color: 0xff5500, transparent: true, opacity: 0.9
+                color: 0xff6622, transparent: true, opacity: 0.9
             }));
-            vent.position.set(i * 1.8, 0.3, saucerRadius + 0.01);
+            vent.position.set(i * 1.5, 0, saucerRadius - 0.9);
             saucerGroup.add(vent);
             this.impulseGlows.push(vent);
         }
 
-        // Phaser array
-        const phaserGeom = new THREE.TorusGeometry(14, 0.1, 6, 64, Math.PI);
+        // Phaser strip - thin elegant line
+        const phaserGeom = new THREE.TorusGeometry(saucerRadius - 5, 0.08, 6, 64, Math.PI * 0.8);
         const phaser = new THREE.Mesh(phaserGeom, new THREE.MeshBasicMaterial({
-            color: 0xff8844, transparent: true, opacity: 0.7
+            color: 0xffaa66, transparent: true, opacity: 0.8
         }));
         phaser.rotation.x = Math.PI / 2;
-        phaser.rotation.z = Math.PI / 2;
-        phaser.position.y = 1.2;
+        phaser.rotation.z = Math.PI * 0.6;
+        phaser.position.y = 1.5;
         saucerGroup.add(phaser);
 
         this.addSaucerWindows(saucerGroup, saucerRadius, windowMaterial);
 
-        saucerGroup.position.z = -14;
+        saucerGroup.position.z = -16;
         this.enterprise.add(saucerGroup);
 
-        // SECONDARY HULL - THINNER
+        // ========== SECONDARY HULL - Sleek torpedo shape ==========
         const hullGroup = new THREE.Group();
-        const hullLength = 38;
-        const hullRadius = 3.5;
+        const hullLength = 42;
+        const hullRadius = 3.2;
 
+        // Smooth hull profile
         const hullPoints = [];
-        for (let i = 0; i <= 24; i++) {
-            const t = i / 24;
+        for (let i = 0; i <= 32; i++) {
+            const t = i / 32;
             const z = (t - 0.5) * hullLength;
             let r;
-            if (t < 0.1) {
-                r = 1.5 + t * 20;
-            } else if (t > 0.9) {
-                r = hullRadius - (t - 0.9) * 30;
+            if (t < 0.08) {
+                // Nose taper
+                r = 1.2 + t * 25;
+            } else if (t > 0.92) {
+                // Tail taper
+                r = hullRadius * (1 - (t - 0.92) * 10);
             } else {
-                r = hullRadius + Math.sin((t - 0.1) * Math.PI / 0.8) * 0.4;
+                // Smooth body with subtle curve
+                r = hullRadius + Math.sin((t - 0.08) * Math.PI / 0.84) * 0.3;
             }
-            hullPoints.push(new THREE.Vector2(Math.max(r, 0.4), z));
+            hullPoints.push(new THREE.Vector2(Math.max(r, 0.3), z));
         }
 
         const hullGeom = new THREE.LatheGeometry(hullPoints, 48);
@@ -1127,149 +1144,207 @@ class StarTrekGame {
         const hull = new THREE.Mesh(hullGeom, hullMaterial);
         hullGroup.add(hull);
 
-        // Deflector
+        // Deflector dish - elegant glowing dish
         const deflectorGroup = new THREE.Group();
-        const defHousingGeom = new THREE.CylinderGeometry(3, 3.5, 3, 32);
+
+        const defHousingGeom = new THREE.CylinderGeometry(2.8, 3.2, 2.5, 32);
         defHousingGeom.rotateX(Math.PI / 2);
         const defHousing = new THREE.Mesh(defHousingGeom, hullMaterialDark);
         deflectorGroup.add(defHousing);
 
-        const defDishGeom = new THREE.SphereGeometry(2.8, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+        // Dish - parabolic shape
+        const defDishGeom = new THREE.SphereGeometry(2.6, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2.2);
         defDishGeom.rotateX(Math.PI);
         const defDish = new THREE.Mesh(defDishGeom, deflectorMaterial);
-        defDish.position.z = -1.2;
+        defDish.position.z = -1.0;
         deflectorGroup.add(defDish);
         this.deflector = defDish;
 
-        const defCenterGeom = new THREE.SphereGeometry(1.4, 24, 16);
+        // Glowing center
+        const defCenterGeom = new THREE.SphereGeometry(1.0, 24, 16);
         const defCenter = new THREE.Mesh(defCenterGeom, new THREE.MeshBasicMaterial({
-            color: 0x00ffff, transparent: true, opacity: 0.9
+            color: 0x00ffff, transparent: true, opacity: 1
         }));
-        defCenter.position.z = -0.8;
+        defCenter.position.z = -0.6;
         deflectorGroup.add(defCenter);
         this.deflectorCenter = defCenter;
 
-        deflectorGroup.position.z = -hullLength / 2 - 2;
+        // Outer ring glow
+        const defRingGeom = new THREE.TorusGeometry(2.4, 0.1, 8, 32);
+        const defRing = new THREE.Mesh(defRingGeom, new THREE.MeshBasicMaterial({
+            color: 0x00ccff, transparent: true, opacity: 0.7
+        }));
+        defRing.position.z = -1.0;
+        deflectorGroup.add(defRing);
+
+        deflectorGroup.position.z = -hullLength / 2 - 1.5;
         hullGroup.add(deflectorGroup);
 
-        // Torpedo tubes
-        for (let i = -1; i <= 1; i += 2) {
-            const tubeGeom = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 12);
-            tubeGeom.rotateX(Math.PI / 2);
-            const tube = new THREE.Mesh(tubeGeom, hullMaterialDark);
-            tube.position.set(i * 0.6, -2.5, -hullLength / 2);
-            hullGroup.add(tube);
-        }
+        // Torpedo launcher - subtle
+        const torpedoGeom = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
+        torpedoGeom.rotateX(Math.PI / 2);
+        const torpedo = new THREE.Mesh(torpedoGeom, hullMaterialDark);
+        torpedo.position.set(0, -2.2, -hullLength / 2 + 2);
+        hullGroup.add(torpedo);
 
-        // Shuttle bay
-        const shuttleBayGeom = new THREE.BoxGeometry(4, 3, 0.8);
+        // Shuttle bay - integrated
+        const shuttleBayGeom = new THREE.BoxGeometry(3.5, 2.5, 0.5);
         const shuttleBay = new THREE.Mesh(shuttleBayGeom, hullMaterialDark);
-        shuttleBay.position.set(0, 0, hullLength / 2 + 1.5);
+        shuttleBay.position.set(0, 0, hullLength / 2 + 0.5);
         hullGroup.add(shuttleBay);
 
         this.addHullWindows(hullGroup, hullLength, hullRadius, windowMaterial);
 
-        hullGroup.position.set(0, -7, 16);
+        hullGroup.position.set(0, -7.5, 18);
         this.enterprise.add(hullGroup);
 
-        // NECK - thinner
+        // ========== NECK - Sleek curved connection ==========
         const neckGroup = new THREE.Group();
-        const neckGeom = new THREE.BoxGeometry(2.5, 10, 3.5);
+
+        // Main neck - curved profile
+        const neckPoints = [];
+        for (let i = 0; i <= 16; i++) {
+            const t = i / 16;
+            const y = t * 11;
+            const z = Math.sin(t * Math.PI * 0.5) * -2;
+            const r = 1.4 + Math.sin(t * Math.PI) * 0.3;
+            neckPoints.push(new THREE.Vector2(r, y));
+        }
+
+        const neckGeom = new THREE.LatheGeometry(neckPoints, 24);
+        neckGeom.rotateZ(Math.PI);
         const neck = new THREE.Mesh(neckGeom, hullMaterial);
+        neck.position.y = -6;
         neckGroup.add(neck);
 
-        const neckFrontGeom = new THREE.BoxGeometry(2.5, 6, 1.5);
-        const neckFront = new THREE.Mesh(neckFrontGeom, hullMaterial);
-        neckFront.position.set(0, 2, -3);
-        neckFront.rotation.x = 0.25;
-        neckGroup.add(neckFront);
-
-        neckGroup.position.set(0, -2, 0);
+        neckGroup.position.set(0, -1, 2);
         this.enterprise.add(neckGroup);
 
-        // NACELLES - THINNER
+        // ========== NACELLES - Sleek elongated pods ==========
         for (let side = -1; side <= 1; side += 2) {
             const nacelleGroup = new THREE.Group();
-            const nacelleLength = 34;
-            const nacelleRadius = 2;
+            const nacelleLength = 38;
+            const nacelleRadius = 1.8;
 
-            const nacelleBodyGeom = new THREE.CylinderGeometry(nacelleRadius, nacelleRadius, nacelleLength, 32);
-            nacelleBodyGeom.rotateX(Math.PI / 2);
-            const nacelleBody = new THREE.Mesh(nacelleBodyGeom, hullMaterial);
+            // Nacelle body - smooth tapered cylinder
+            const nacellePoints = [];
+            for (let i = 0; i <= 24; i++) {
+                const t = i / 24;
+                const z = (t - 0.5) * nacelleLength;
+                let r = nacelleRadius;
+                if (t < 0.1) {
+                    r = nacelleRadius * (0.5 + t * 5);
+                } else if (t > 0.9) {
+                    r = nacelleRadius * (1 - (t - 0.9) * 5);
+                }
+                nacellePoints.push(new THREE.Vector2(r, z));
+            }
+
+            const nacelleGeom = new THREE.LatheGeometry(nacellePoints, 32);
+            nacelleGeom.rotateX(Math.PI / 2);
+            const nacelleBody = new THREE.Mesh(nacelleGeom, hullMaterial);
             nacelleGroup.add(nacelleBody);
 
-            const nacelleRearGeom = new THREE.SphereGeometry(nacelleRadius, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-            nacelleRearGeom.rotateX(Math.PI / 2);
-            const nacelleRear = new THREE.Mesh(nacelleRearGeom, hullMaterial);
-            nacelleRear.position.z = nacelleLength / 2;
-            nacelleGroup.add(nacelleRear);
-
-            const bussardGeom = new THREE.SphereGeometry(nacelleRadius + 0.2, 32, 24);
+            // Bussard collector - glowing red sphere
+            const bussardGeom = new THREE.SphereGeometry(nacelleRadius + 0.3, 32, 24);
             const bussard = new THREE.Mesh(bussardGeom, bussardMaterial);
-            bussard.position.z = -nacelleLength / 2 - 0.3;
+            bussard.position.z = -nacelleLength / 2;
             nacelleGroup.add(bussard);
 
-            const bussardGlowGeom = new THREE.SphereGeometry(nacelleRadius - 0.4, 24, 16);
+            // Inner bussard glow
+            const bussardGlowGeom = new THREE.SphereGeometry(nacelleRadius - 0.3, 24, 16);
             const bussardGlow = new THREE.Mesh(bussardGlowGeom, new THREE.MeshBasicMaterial({
-                color: 0xff5500, transparent: true, opacity: 0.85
+                color: 0xff4400, transparent: true, opacity: 0.9
             }));
-            bussardGlow.position.z = -nacelleLength / 2 - 0.3;
+            bussardGlow.position.z = -nacelleLength / 2;
             nacelleGroup.add(bussardGlow);
             this.bussardGlows.push(bussardGlow);
 
-            const grilleGeom = new THREE.BoxGeometry(1.2, 0.2, nacelleLength - 6);
+            // Warp grille - sleek glowing strip
+            const grilleGeom = new THREE.BoxGeometry(0.8, 0.15, nacelleLength - 8);
             const grille = new THREE.Mesh(grilleGeom, warpGlowMaterial);
-            grille.position.y = nacelleRadius + 0.1;
+            grille.position.y = nacelleRadius + 0.08;
             nacelleGroup.add(grille);
             this.nacelleGlows.push(grille);
 
-            const nacelleX = side * 12;
-            const nacelleY = 6;
-            const nacelleZ = 14;
+            // Secondary grille glow
+            const grilleGlowGeom = new THREE.BoxGeometry(1.2, 0.05, nacelleLength - 6);
+            const grilleGlow = new THREE.Mesh(grilleGlowGeom, new THREE.MeshBasicMaterial({
+                color: 0x88ddff, transparent: true, opacity: 0.4
+            }));
+            grilleGlow.position.y = nacelleRadius + 0.2;
+            nacelleGroup.add(grilleGlow);
+
+            // Nacelle end cap
+            const endCapGeom = new THREE.SphereGeometry(nacelleRadius * 0.6, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+            endCapGeom.rotateX(Math.PI / 2);
+            const endCap = new THREE.Mesh(endCapGeom, hullMaterialDark);
+            endCap.position.z = nacelleLength / 2;
+            nacelleGroup.add(endCap);
+
+            const nacelleX = side * 13;
+            const nacelleY = 7;
+            const nacelleZ = 16;
             nacelleGroup.position.set(nacelleX, nacelleY, nacelleZ);
             this.enterprise.add(nacelleGroup);
 
-            // Pylon - thinner
+            // Pylon - sleek angled strut
             const pylonGroup = new THREE.Group();
-            const pylonGeom = new THREE.BoxGeometry(0.8, 12, 3);
+
+            // Curved pylon shape
+            const pylonShape = new THREE.Shape();
+            pylonShape.moveTo(0, -6);
+            pylonShape.lineTo(0.4, -6);
+            pylonShape.lineTo(0.4, 6);
+            pylonShape.lineTo(0, 6);
+            pylonShape.lineTo(0, -6);
+
+            const pylonExtrudeSettings = {
+                steps: 1, depth: 2.5, bevelEnabled: true,
+                bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: 2
+            };
+
+            const pylonGeom = new THREE.ExtrudeGeometry(pylonShape, pylonExtrudeSettings);
+            pylonGeom.translate(-0.2, 0, -1.25);
             const pylon = new THREE.Mesh(pylonGeom, hullMaterial);
             pylonGroup.add(pylon);
 
-            const pylonX = side * 7;
-            pylonGroup.position.set(pylonX, -0.5, 14);
-            pylonGroup.rotation.z = side * -0.35;
-            pylonGroup.rotation.x = 0.08;
+            const pylonX = side * 8;
+            pylonGroup.position.set(pylonX, 0, 16);
+            pylonGroup.rotation.z = side * -0.38;
+            pylonGroup.rotation.x = 0.05;
             this.enterprise.add(pylonGroup);
         }
 
-        // Nav lights
+        // ========== NAV LIGHTS ==========
         const lights = [
-            { pos: [0, 5.5, -14], color: 0x00ff00 },
-            { pos: [-saucerRadius - 0.3, 0, -14], color: 0xff0000 },
-            { pos: [saucerRadius + 0.3, 0, -14], color: 0x00ff00 },
-            { pos: [0, -7, 26], color: 0xffffff },
+            { pos: [0, 5.5, -16], color: 0x00ff00 },
+            { pos: [-saucerRadius - 0.2, 0, -16], color: 0xff0000 },
+            { pos: [saucerRadius + 0.2, 0, -16], color: 0x00ff00 },
+            { pos: [0, -7.5, 40], color: 0xffffff },
         ];
 
         lights.forEach(({ pos, color }) => {
-            const lightGeom = new THREE.SphereGeometry(0.25, 8, 8);
+            const lightGeom = new THREE.SphereGeometry(0.2, 8, 8);
             const light = new THREE.Mesh(lightGeom, new THREE.MeshBasicMaterial({ color }));
             light.position.set(...pos);
             this.enterprise.add(light);
         });
 
-        const strobeGeom = new THREE.SphereGeometry(0.3, 8, 8);
+        // Strobe light
+        const strobeGeom = new THREE.SphereGeometry(0.25, 8, 8);
         this.strobeLight = new THREE.Mesh(strobeGeom, new THREE.MeshBasicMaterial({
             color: 0xffffff, transparent: true, opacity: 0
         }));
-        this.strobeLight.position.set(0, 5.5, -14);
+        this.strobeLight.position.set(0, 5.5, -16);
         this.enterprise.add(this.strobeLight);
 
-        this.enterprise.scale.set(0.4, 0.4, 0.4);
+        this.enterprise.scale.set(0.35, 0.35, 0.35);
         this.enterprise.rotation.y = Math.PI;
         this.scene.add(this.enterprise);
 
         // Shield mesh
-        const shieldGeom = new THREE.SphereGeometry(22, 32, 32);
+        const shieldGeom = new THREE.SphereGeometry(25, 32, 32);
         this.shieldMesh = new THREE.Mesh(shieldGeom, new THREE.MeshBasicMaterial({
             color: 0x44aaff, transparent: true, opacity: 0, side: THREE.DoubleSide
         }));
@@ -1277,15 +1352,17 @@ class StarTrekGame {
     }
 
     addSaucerWindows(saucerGroup, radius, material) {
-        for (let ring = 0; ring < 3; ring++) {
-            const r = radius - 2 - ring * 3;
-            const count = Math.floor(28 - ring * 6);
+        // Elegant window pattern - fewer, more refined
+        for (let ring = 0; ring < 4; ring++) {
+            const r = radius - 3 - ring * 3.5;
+            const count = Math.floor(32 - ring * 6);
             for (let i = 0; i < count; i++) {
                 const angle = (i / count) * Math.PI * 2;
-                if (angle > 1.2 && angle < 1.9) continue;
-                const windowGeom = new THREE.CircleGeometry(0.15, 6);
+                // Skip rear section for cleaner look
+                if (angle > 1.0 && angle < 2.1) continue;
+                const windowGeom = new THREE.CircleGeometry(0.12, 8);
                 const window = new THREE.Mesh(windowGeom, material);
-                window.position.set(Math.cos(angle) * r, 1.1 - ring * 0.08, Math.sin(angle) * r);
+                window.position.set(Math.cos(angle) * r, 1.6 - ring * 0.15, Math.sin(angle) * r);
                 window.rotation.x = -Math.PI / 2;
                 saucerGroup.add(window);
             }
@@ -1293,15 +1370,18 @@ class StarTrekGame {
     }
 
     addHullWindows(hullGroup, length, radius, material) {
-        for (let row = 0; row < 4; row++) {
-            for (let i = 0; i < 12; i++) {
-                const angle = (i / 12) * Math.PI * 2;
-                if (Math.sin(angle) < -0.3) continue;
-                const windowGeom = new THREE.CircleGeometry(0.12, 6);
+        // Sleek window rows along hull
+        for (let row = 0; row < 5; row++) {
+            const numWindows = row === 0 || row === 4 ? 8 : 10;
+            for (let i = 0; i < numWindows; i++) {
+                const angle = (i / numWindows) * Math.PI * 2;
+                // Only show windows on top half
+                if (Math.sin(angle) < -0.2) continue;
+                const windowGeom = new THREE.CircleGeometry(0.1, 8);
                 const window = new THREE.Mesh(windowGeom, material);
-                const r = radius + 0.03;
-                window.position.set(Math.cos(angle) * r, Math.sin(angle) * r, -8 + row * 5);
-                window.lookAt(Math.cos(angle) * (r + 1), Math.sin(angle) * (r + 1), -8 + row * 5);
+                const r = radius + 0.02;
+                window.position.set(Math.cos(angle) * r, Math.sin(angle) * r, -12 + row * 6);
+                window.lookAt(Math.cos(angle) * (r + 1), Math.sin(angle) * (r + 1), -12 + row * 6);
                 hullGroup.add(window);
             }
         }
