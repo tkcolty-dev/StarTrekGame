@@ -1688,11 +1688,11 @@ class StarTrekGame {
 
         // Enemy stats by type
         const enemyStats = {
-            klingon: { health: 120, shields: 120, speed: 0.4, turnSpeed: 0.015, damage: 30, fireRate: 2500, credits: 100, scale: 0.45, shieldColor: 0x44ff44 },
-            romulan: { health: 100, shields: 100, speed: 0.5, turnSpeed: 0.02, damage: 25, fireRate: 3000, credits: 150, scale: 0.4, shieldColor: 0x44ff88 },
-            borg: { health: 300, shields: 200, speed: 0.2, turnSpeed: 0.008, damage: 50, fireRate: 4000, credits: 400, scale: 0.6, shieldColor: 0x88ff88, regenerates: true },
-            gorn: { health: 80, shields: 60, speed: 0.7, turnSpeed: 0.03, damage: 20, fireRate: 1500, credits: 80, scale: 0.35, shieldColor: 0xffff44 },
-            cardassian: { health: 150, shields: 150, speed: 0.35, turnSpeed: 0.012, damage: 35, fireRate: 3500, credits: 200, scale: 0.5, shieldColor: 0xffaa44 }
+            klingon: { health: 120, shields: 120, speed: 0.4, turnSpeed: 0.015, damage: 30, fireRate: 1200, credits: 100, scale: 0.45, shieldColor: 0x44ff44 },
+            romulan: { health: 100, shields: 100, speed: 0.5, turnSpeed: 0.02, damage: 25, fireRate: 1500, credits: 150, scale: 0.4, shieldColor: 0x44ff88 },
+            borg: { health: 300, shields: 200, speed: 0.2, turnSpeed: 0.008, damage: 50, fireRate: 2000, credits: 400, scale: 0.6, shieldColor: 0x88ff88, regenerates: true },
+            gorn: { health: 80, shields: 60, speed: 0.7, turnSpeed: 0.03, damage: 20, fireRate: 800, credits: 80, scale: 0.35, shieldColor: 0xffff44 },
+            cardassian: { health: 150, shields: 150, speed: 0.35, turnSpeed: 0.012, damage: 35, fireRate: 1800, credits: 200, scale: 0.5, shieldColor: 0xffaa44 }
         };
 
         const stats = enemyStats[type] || enemyStats.klingon;
@@ -3188,7 +3188,7 @@ class StarTrekGame {
 
             // Fire at player when in range
             const now = Date.now();
-            if (distance < 400 && now - enemy.userData.lastFire > enemy.userData.fireRate) {
+            if (distance < 500 && now - enemy.userData.lastFire > enemy.userData.fireRate) {
                 enemy.userData.lastFire = now;
                 this.enemyFire(enemy);
             }
@@ -3301,6 +3301,111 @@ class StarTrekGame {
 
         this.updateUI();
         this.updateMinimap();
+        this.drawEnemyIndicators();
+    }
+
+    drawEnemyIndicators() {
+        if (!this.indicatorCanvas) {
+            this.indicatorCanvas = document.createElement('canvas');
+            this.indicatorCanvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;';
+            document.body.appendChild(this.indicatorCanvas);
+            this.indicatorCtx = this.indicatorCanvas.getContext('2d');
+        }
+
+        const canvas = this.indicatorCanvas;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const ctx = this.indicatorCtx;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!this.gameStarted || this.isPaused || this.enemies.length === 0) return;
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const margin = 50;
+
+        this.enemies.forEach(enemy => {
+            // Project enemy position to screen
+            const pos = enemy.position.clone();
+            pos.project(this.camera);
+
+            const screenX = (pos.x * 0.5 + 0.5) * canvas.width;
+            const screenY = (-pos.y * 0.5 + 0.5) * canvas.height;
+
+            // Check if enemy is off-screen or behind camera
+            const isOffScreen = screenX < 0 || screenX > canvas.width ||
+                                screenY < 0 || screenY > canvas.height || pos.z > 1;
+
+            if (!isOffScreen) return;
+
+            // Calculate angle from center of screen to enemy
+            const dx = screenX - centerX;
+            const dy = screenY - centerY;
+            let angle = Math.atan2(dy, dx);
+
+            // If behind camera, flip direction
+            if (pos.z > 1) {
+                angle = Math.atan2(-dy, -dx);
+            }
+
+            // Place arrow at screen edge
+            const edgeX = Math.cos(angle);
+            const edgeY = Math.sin(angle);
+
+            // Find where the line hits the screen edge
+            const maxExtentX = (canvas.width / 2) - margin;
+            const maxExtentY = (canvas.height / 2) - margin;
+            const scale = Math.min(
+                Math.abs(maxExtentX / (edgeX || 0.001)),
+                Math.abs(maxExtentY / (edgeY || 0.001))
+            );
+
+            const arrowX = centerX + edgeX * scale;
+            const arrowY = centerY + edgeY * scale;
+
+            // Distance for sizing/opacity
+            const dist = this.enterprise.position.distanceTo(enemy.position);
+            const alpha = Math.max(0.4, Math.min(1.0, 1.0 - (dist - 100) / 500));
+
+            // Color based on enemy type
+            const colors = {
+                klingon: '#ff4444',
+                romulan: '#44ff88',
+                borg: '#88ff88',
+                gorn: '#ffff44',
+                cardassian: '#ffaa44'
+            };
+            const color = colors[enemy.userData.type] || '#ff4444';
+
+            // Draw arrow
+            ctx.save();
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(angle);
+            ctx.globalAlpha = alpha;
+
+            // Arrow shape
+            ctx.beginPath();
+            ctx.moveTo(18, 0);
+            ctx.lineTo(-8, -10);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-8, 10);
+            ctx.closePath();
+
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Distance label
+            ctx.rotate(-angle);
+            ctx.font = 'bold 10px monospace';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.fillText(Math.round(dist) + 'm', 0, -16);
+
+            ctx.restore();
+        });
     }
 
     enemyFire(enemy) {
