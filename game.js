@@ -16,7 +16,7 @@ class StarTrekGame {
             energy: 100, maxEnergy: 100,
             phaserCharge: 100,
             torpedoes: 10, maxTorpedoes: 10,
-            phaserDamage: 25, torpedoDamage: 100,
+            phaserDamage: 50, torpedoDamage: 200,
             shieldsActive: true,
             speed: 0, maxSpeed: 2,
             warpSpeed: 0, maxWarp: 9,
@@ -2519,48 +2519,59 @@ class StarTrekGame {
         if (this.phaserCooldown > 0) this.phaserCooldown -= deltaTime;
         if (this.torpedoCooldown > 0) this.torpedoCooldown -= deltaTime;
 
-        // Mouse flight controls - ship turns towards mouse position
-        const turnSpeed = this.stats.turnSpeed * deltaTime * 0.05;
+        // WAR THUNDER STYLE MOUSE CONTROLS
+        // Ship smoothly flies toward where the mouse is pointing
+        if (this.mouseFlightEnabled && this.gameStarted && !this.autopilotEnabled) {
+            // Calculate target direction based on mouse position
+            // Mouse at center = fly straight, mouse offset = turn that direction
+            const mouseX = this.mouse.x; // -1 to 1
+            const mouseY = this.mouse.y; // -1 to 1
 
-        if (this.mouseFlightEnabled && this.gameStarted) {
-            // Check if mouse is near UI edges (straighten out if near edges)
-            const edgeMargin = 0.7; // How close to edge before straightening
-            const nearEdge = Math.abs(this.mouse.x) > edgeMargin || Math.abs(this.mouse.y) > edgeMargin;
+            // Target yaw and pitch based on mouse position
+            // The ship tries to rotate so it's pointing where the mouse indicates
+            const targetYawOffset = -mouseX * 0.8; // How much to turn left/right
+            const targetPitchOffset = mouseY * 0.4; // How much to pitch up/down
 
-            if (nearEdge) {
-                // Straighten out the ship when near UI/edges
-                this.enterprise.rotation.x *= 0.95;
-                this.enterprise.rotation.z *= 0.95;
-            } else if (!this.autopilotEnabled) {
-                // Flipped left/right - move mouse right to turn left
-                const yawInput = this.mouse.x * this.mouseSensitivity * deltaTime;
-                this.enterprise.rotation.y -= yawInput;
+            // Smooth interpolation factor (higher = more responsive)
+            const smoothing = 0.04;
 
-                // Normal vertical - mouse down = pitch down
-                const pitchInput = this.mouse.y * this.mouseSensitivity * deltaTime * 0.5;
-                this.enterprise.rotation.x += pitchInput;
-                // Clamp pitch
-                this.enterprise.rotation.x = Math.max(-0.5, Math.min(0.5, this.enterprise.rotation.x));
-            }
+            // Calculate desired rotation changes
+            const currentPitch = this.enterprise.rotation.x;
+            const desiredPitch = targetPitchOffset;
 
-            // Auto-level roll slowly
-            this.enterprise.rotation.z *= 0.98;
+            // Smoothly interpolate pitch
+            this.enterprise.rotation.x += (desiredPitch - currentPitch) * smoothing;
+            this.enterprise.rotation.x = Math.max(-0.6, Math.min(0.6, this.enterprise.rotation.x));
 
-            // Autopilot - automatically fly towards nearest enemy
-            if (this.autopilotEnabled && this.targetLocked) {
-                const toTarget = this.targetLocked.position.clone().sub(this.enterprise.position).normalize();
-                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.enterprise.quaternion);
+            // Apply yaw based on mouse offset (the further from center, the faster the turn)
+            const yawRate = targetYawOffset * 0.03;
+            this.enterprise.rotation.y += yawRate;
 
-                // Calculate turn needed
-                const cross = new THREE.Vector3().crossVectors(forward, toTarget);
-                this.enterprise.rotation.y += cross.y * 0.02;
-                this.enterprise.rotation.x -= cross.x * 0.01;
-                this.enterprise.rotation.x = Math.max(-0.3, Math.min(0.3, this.enterprise.rotation.x));
+            // Auto-level roll smoothly
+            this.enterprise.rotation.z *= 0.95;
 
-                // Auto-accelerate
-                this.stats.speed = Math.min(this.stats.speed + 0.01, this.stats.maxSpeed * 0.7);
-            }
+            // Add slight roll when turning (like a real aircraft/ship)
+            this.enterprise.rotation.z -= mouseX * 0.01;
+            this.enterprise.rotation.z = Math.max(-0.3, Math.min(0.3, this.enterprise.rotation.z));
         }
+
+        // Autopilot - automatically fly towards nearest enemy
+        if (this.autopilotEnabled && this.targetLocked && this.gameStarted) {
+            const toTarget = this.targetLocked.position.clone().sub(this.enterprise.position).normalize();
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.enterprise.quaternion);
+
+            // Calculate turn needed
+            const cross = new THREE.Vector3().crossVectors(forward, toTarget);
+            this.enterprise.rotation.y += cross.y * 0.025;
+            this.enterprise.rotation.x -= cross.x * 0.015;
+            this.enterprise.rotation.x = Math.max(-0.4, Math.min(0.4, this.enterprise.rotation.x));
+            this.enterprise.rotation.z *= 0.95;
+
+            // Auto-accelerate
+            this.stats.speed = Math.min(this.stats.speed + 0.01, this.stats.maxSpeed * 0.7);
+        }
+
+        const turnSpeed = this.stats.turnSpeed * deltaTime * 0.05;
 
         // Keyboard controls still work for fine adjustments
         if (this.keys['a'] || this.keys['arrowleft']) this.enterprise.rotation.y += turnSpeed;
