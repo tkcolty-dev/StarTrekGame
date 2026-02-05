@@ -318,6 +318,12 @@
             border: 1px solid rgba(150, 100, 255, 0.3);
         }
 
+        .mission-difficulty.fleet {
+            background: rgba(68, 136, 255, 0.2);
+            color: #6699ff;
+            border: 1px solid rgba(68, 136, 255, 0.3);
+        }
+
         /* Mission select - hidden by default */
         .mission-select {
             display: none;
@@ -1166,6 +1172,18 @@
                 <div class="mission-meta">
                     <div class="mission-waves">10 WAVES</div>
                     <div class="mission-difficulty expert">EXPERT</div>
+                </div>
+            </div>
+
+            <div class="mission-card" onclick="game.startMission('fleet')">
+                <div class="mission-icon" style="color: #6699ff; border-color: rgba(68, 136, 255, 0.3);">IV</div>
+                <div class="mission-content">
+                    <div class="mission-name">Fleet Battle</div>
+                    <div class="mission-desc">Command a Federation squadron against overwhelming enemy forces</div>
+                </div>
+                <div class="mission-meta">
+                    <div class="mission-waves">8 WAVES</div>
+                    <div class="mission-difficulty fleet">FLEET</div>
                 </div>
             </div>
 

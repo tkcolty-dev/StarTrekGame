@@ -7,6 +7,8 @@ class StarTrekGame {
         this.renderer = null;
         this.enterprise = null;
         this.enemies = [];
+        this.allies = [];
+        this.allyShipNames = ['USS Excalibur', 'USS Lexington', 'USS Defiant', 'USS Hood'];
         this.projectiles = [];
         this.particles = [];
 
@@ -68,6 +70,7 @@ class StarTrekGame {
             patrol: { name: 'Border Patrol', desc: 'Defend the neutral zone from Klingon raiders', waves: 5, difficulty: 1 },
             rescue: { name: 'Rescue Mission', desc: 'Fight through Romulan forces to rescue stranded crew', waves: 7, difficulty: 1.5 },
             assault: { name: 'Deep Strike', desc: 'Assault enemy staging area', waves: 10, difficulty: 2 },
+            fleet: { name: 'Fleet Battle', desc: 'Command a Federation squadron against overwhelming enemy forces', waves: 8, difficulty: 2.5, allies: 3 },
             survival: { name: 'Survival', desc: 'Survive endless waves of enemies', waves: Infinity, difficulty: 1 }
         };
 
@@ -1949,6 +1952,277 @@ class StarTrekGame {
         this.showCrewDialog('SPOCK', `Captain, sensors detecting ${enemyCount} hostile vessels approaching.`);
     }
 
+    createAlly(name) {
+        const ally = new THREE.Group();
+
+        // Federation blue/white color scheme
+        const hullMat = new THREE.MeshPhongMaterial({ color: 0xccccdd, specular: 0x666688 });
+        const accentMat = new THREE.MeshPhongMaterial({ color: 0x8899bb });
+        const nacelleGlow = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.8 });
+        const deflectorMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.7 });
+
+        // Saucer section
+        const saucer = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 1.5, 24), hullMat);
+        saucer.rotation.x = 0;
+        ally.add(saucer);
+
+        // Bridge dome
+        const bridge = new THREE.Mesh(new THREE.SphereGeometry(2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), accentMat);
+        bridge.position.y = 0.75;
+        ally.add(bridge);
+
+        // Engineering hull (secondary hull)
+        const engHull = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2, 12, 8), hullMat);
+        engHull.rotation.x = Math.PI / 2;
+        engHull.position.set(0, -2, 5);
+        ally.add(engHull);
+
+        // Neck connecting saucer to engineering hull
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 3), hullMat);
+        neck.position.set(0, -1, 1.5);
+        ally.add(neck);
+
+        // Nacelle pylons and nacelles
+        for (let side = -1; side <= 1; side += 2) {
+            const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 1.5), accentMat);
+            pylon.position.set(side * 4, -2, 6);
+            pylon.rotation.z = side * 0.2;
+            ally.add(pylon);
+
+            const nacelle = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 10, 8), accentMat);
+            nacelle.rotation.x = Math.PI / 2;
+            nacelle.position.set(side * 5.5, -4, 5);
+            ally.add(nacelle);
+
+            // Nacelle glow
+            const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 9, 8), nacelleGlow);
+            glow.rotation.x = Math.PI / 2;
+            glow.position.set(side * 5.5, -3.8, 5);
+            ally.add(glow);
+
+            // Bussard collector
+            const bussard = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.7 }));
+            bussard.position.set(side * 5.5, -4, 0);
+            ally.add(bussard);
+        }
+
+        // Deflector dish
+        const deflector = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), deflectorMat);
+        deflector.position.set(0, -2, -1);
+        ally.add(deflector);
+
+        ally.scale.set(0.4, 0.4, 0.4);
+
+        // Ally stats - similar to player but slightly weaker
+        ally.userData = {
+            type: 'federation',
+            name: name,
+            health: 80,
+            maxHealth: 80,
+            shields: 80,
+            maxShields: 80,
+            fireRate: 1500,
+            damage: 30,
+            lastFire: 0,
+            speed: 0.5,
+            turnSpeed: 0.02,
+            formationOffset: new THREE.Vector3(),
+            engagingEnemy: null
+        };
+
+        // Blue shield mesh
+        const shieldGeom = new THREE.SphereGeometry(15, 16, 16);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
+        });
+        const shieldMesh = new THREE.Mesh(shieldGeom, shieldMat);
+        ally.add(shieldMesh);
+        ally.userData.shieldMesh = shieldMesh;
+
+        return ally;
+    }
+
+    spawnAllies(count) {
+        // Clear existing allies
+        this.allies.forEach(a => this.scene.remove(a));
+        this.allies = [];
+
+        // V-formation offsets behind/beside the Enterprise
+        const formationOffsets = [
+            new THREE.Vector3(-30, 0, 30),   // Left wing
+            new THREE.Vector3(30, 0, 30),     // Right wing
+            new THREE.Vector3(-55, -5, 55),   // Far left
+            new THREE.Vector3(55, -5, 55)     // Far right
+        ];
+
+        for (let i = 0; i < count && i < this.allyShipNames.length; i++) {
+            const ally = this.createAlly(this.allyShipNames[i]);
+
+            ally.userData.formationOffset = formationOffsets[i].clone();
+            ally.position.copy(this.enterprise.position).add(formationOffsets[i]);
+            ally.quaternion.copy(this.enterprise.quaternion);
+
+            this.allies.push(ally);
+            this.scene.add(ally);
+        }
+
+        this.showCrewDialog('UHURA', 'Captain, the fleet is in formation and ready.');
+    }
+
+    updateAllies(deltaTime) {
+        if (this.allies.length === 0) return;
+
+        const now = Date.now();
+
+        this.allies.forEach(ally => {
+            // Find nearest enemy
+            let nearestEnemy = null;
+            let nearestDist = Infinity;
+            this.enemies.forEach(enemy => {
+                const dist = ally.position.distanceTo(enemy.position);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearestEnemy = enemy;
+                }
+            });
+
+            // Movement AI
+            if (nearestEnemy && nearestDist < 200) {
+                // Break formation and engage enemy
+                ally.userData.engagingEnemy = nearestEnemy;
+
+                // Turn toward enemy
+                const targetQuat = new THREE.Quaternion();
+                const lookMatrix = new THREE.Matrix4().lookAt(ally.position, nearestEnemy.position, new THREE.Vector3(0, 1, 0));
+                targetQuat.setFromRotationMatrix(lookMatrix);
+                ally.quaternion.slerp(targetQuat, ally.userData.turnSpeed);
+
+                if (nearestDist > 80) {
+                    // Approach enemy
+                    const moveDir = nearestEnemy.position.clone().sub(ally.position).normalize();
+                    ally.position.add(moveDir.multiplyScalar(ally.userData.speed));
+                } else {
+                    // Circle-strafe at close range
+                    const toEnemy = nearestEnemy.position.clone().sub(ally.position);
+                    const perpendicular = new THREE.Vector3(-toEnemy.z, 0, toEnemy.x).normalize();
+                    ally.position.add(perpendicular.multiplyScalar(ally.userData.speed * 0.4));
+                }
+
+                // Combat AI - fire phasers at enemies in range
+                if (nearestDist < 350 && now - ally.userData.lastFire > ally.userData.fireRate) {
+                    ally.userData.lastFire = now;
+                    this.allyFire(ally, nearestEnemy);
+                }
+            } else {
+                // Maintain formation with player
+                ally.userData.engagingEnemy = null;
+
+                // Apply player rotation to formation offset
+                const rotatedOffset = ally.userData.formationOffset.clone().applyQuaternion(this.enterprise.quaternion);
+                const desiredPos = this.enterprise.position.clone().add(rotatedOffset);
+                const toDesired = desiredPos.clone().sub(ally.position);
+                const desiredDist = toDesired.length();
+
+                // Turn toward formation position
+                if (desiredDist > 5) {
+                    const targetQuat = new THREE.Quaternion();
+                    const lookMatrix = new THREE.Matrix4().lookAt(ally.position, desiredPos, new THREE.Vector3(0, 1, 0));
+                    targetQuat.setFromRotationMatrix(lookMatrix);
+                    ally.quaternion.slerp(targetQuat, ally.userData.turnSpeed * 1.5);
+
+                    const moveSpeed = Math.min(ally.userData.speed * 1.5, desiredDist * 0.05);
+                    ally.position.add(toDesired.normalize().multiplyScalar(moveSpeed));
+                } else {
+                    // Match player rotation when in position
+                    ally.quaternion.slerp(this.enterprise.quaternion, 0.05);
+                }
+            }
+
+            // Regenerate ally shields slowly
+            if (ally.userData.shields < ally.userData.maxShields) {
+                ally.userData.shields += deltaTime * 0.003;
+            }
+        });
+    }
+
+    allyFire(ally, target) {
+        // Create orange phaser beam (Federation but distinct from player)
+        const start = ally.position.clone();
+        const direction = target.position.clone().sub(start).normalize();
+        const end = start.clone().add(direction.multiplyScalar(350));
+
+        const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+        const material = new THREE.LineBasicMaterial({
+            color: 0xff8844, transparent: true, opacity: 1
+        });
+        const beam = new THREE.Line(geometry, material);
+        beam.userData = { life: 300, damage: ally.userData.damage, type: 'ally' };
+
+        this.projectiles.push(beam);
+        this.scene.add(beam);
+
+        // Check immediate hit (phaser is instant like player phasers)
+        this.enemies.forEach(enemy => {
+            const dist = this.pointToLineDistance(enemy.position, start, end);
+            if (dist < 15) {
+                this.damageEnemy(enemy, ally.userData.damage);
+            }
+        });
+    }
+
+    damageAlly(ally, damage) {
+        // Shields absorb damage first
+        if (ally.userData.shields > 0) {
+            const shieldDamage = Math.min(damage, ally.userData.shields);
+            ally.userData.shields -= shieldDamage;
+            damage -= shieldDamage;
+
+            // Shield hit effect
+            if (ally.userData.shieldMesh) {
+                ally.userData.shieldMesh.material.opacity = 0.5;
+                setTimeout(() => {
+                    if (ally.userData.shieldMesh) {
+                        ally.userData.shieldMesh.material.opacity = 0;
+                    }
+                }, 150);
+            }
+        }
+
+        // Remaining damage hits hull
+        if (damage > 0) {
+            ally.userData.health -= damage;
+
+            // Flash red
+            ally.traverse(child => {
+                if (child.isMesh && child.material.color && child !== ally.userData.shieldMesh) {
+                    const originalColor = child.material.color.getHex();
+                    child.material.color.setHex(0xff0000);
+                    setTimeout(() => child.material.color.setHex(originalColor), 100);
+                }
+            });
+        }
+
+        if (ally.userData.health <= 0) {
+            this.destroyAlly(ally);
+        }
+    }
+
+    destroyAlly(ally) {
+        this.createExplosion(ally.position.clone());
+        this.playExplosionSound();
+
+        const index = this.allies.indexOf(ally);
+        if (index > -1) {
+            this.allies.splice(index, 1);
+            this.scene.remove(ally);
+        }
+
+        this.showCrewDialog('UHURA', `We've lost a ship! ${ally.userData.name} is gone!`);
+    }
+
     showAlert(message) {
         const alertBar = document.getElementById('alertBar');
         if (alertBar) {
@@ -2264,11 +2538,21 @@ class StarTrekGame {
         this.enemies.forEach(e => this.scene.remove(e));
         this.enemies = [];
 
+        // Clear allies
+        this.allies.forEach(a => this.scene.remove(a));
+        this.allies = [];
+
         // Hide title, show game UI
         document.getElementById('titleScreen').classList.remove('active');
         document.getElementById('gameUI').style.display = 'block';
 
         this.spawnWave();
+
+        // Spawn allies if mission has them
+        if (mission.allies) {
+            this.spawnAllies(mission.allies);
+        }
+
         this.startCombatMusic();
     }
 
@@ -2285,6 +2569,8 @@ class StarTrekGame {
         this.isGameOver = false;
         this.enemies.forEach(e => this.scene.remove(e));
         this.enemies = [];
+        this.allies.forEach(a => this.scene.remove(a));
+        this.allies = [];
         document.getElementById('gameOverScreen').classList.remove('active');
         document.getElementById('gameUI').style.display = 'none';
         document.getElementById('titleScreen').classList.add('active');
@@ -2396,6 +2682,20 @@ class StarTrekGame {
                 ctx.beginPath();
                 ctx.arc(size / 2 + dx, size / 2 + dz, 4, 0, Math.PI * 2);
                 ctx.fillStyle = enemy === this.targetLocked ? '#ffff00' : (enemy.userData.type === 'klingon' ? '#ff3366' : '#66ff33');
+                ctx.fill();
+            }
+        });
+
+        // Draw allies as blue dots
+        this.allies.forEach(ally => {
+            const dx = (ally.position.x - this.enterprise.position.x) * scale;
+            const dz = (ally.position.z - this.enterprise.position.z) * scale;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+
+            if (dist < size / 2 - 10) {
+                ctx.beginPath();
+                ctx.arc(size / 2 + dx, size / 2 + dz, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#4488ff';
                 ctx.fill();
             }
         });
@@ -2916,10 +3216,15 @@ class StarTrekGame {
             title.className = 'game-over-title defeat';
         }
 
+        const mission = this.currentMission ? this.missions[this.currentMission] : null;
+        const allyLine = (mission && mission.allies)
+            ? `<br>Fleet Surviving: ${this.allies.length}/${mission.allies}`
+            : '';
+
         stats.innerHTML = `
             Waves Completed: ${this.wave - 1}<br>
             Enemies Destroyed: ${this.enemiesKilled}<br>
-            Credits Earned: ${this.stats.credits}
+            Credits Earned: ${this.stats.credits}${allyLine}
         `;
 
         screen.classList.add('active');
@@ -3194,6 +3499,9 @@ class StarTrekGame {
             }
         });
 
+        // Update allies
+        this.updateAllies(deltaTime);
+
         // Update projectiles
         this.projectiles = this.projectiles.filter(proj => {
             proj.userData.life -= deltaTime;
@@ -3215,12 +3523,26 @@ class StarTrekGame {
                 });
             } else if (proj.userData.type === 'phaser') {
                 proj.material.opacity -= deltaTime * 0.003;
+            } else if (proj.userData.type === 'ally') {
+                // Ally phaser beams fade out like player phasers
+                proj.material.opacity -= deltaTime * 0.003;
             } else if (proj.userData.type === 'enemy') {
                 proj.position.add(proj.userData.velocity);
 
+                // Check hit on player
                 if (proj.position.distanceTo(this.enterprise.position) < 15) {
                     this.damagePlayer(proj.userData.damage);
                     proj.userData.life = 0;
+                }
+
+                // Check hit on allies
+                for (let i = this.allies.length - 1; i >= 0; i--) {
+                    const ally = this.allies[i];
+                    if (proj.position.distanceTo(ally.position) < 12) {
+                        this.damageAlly(ally, proj.userData.damage);
+                        proj.userData.life = 0;
+                        break;
+                    }
                 }
             }
 
@@ -3318,41 +3640,36 @@ class StarTrekGame {
         const ctx = this.indicatorCtx;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (!this.gameStarted || this.isPaused || this.enemies.length === 0) return;
+        if (!this.gameStarted || this.isPaused) return;
+        if (this.enemies.length === 0 && this.allies.length === 0) return;
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const margin = 50;
 
-        this.enemies.forEach(enemy => {
-            // Project enemy position to screen
-            const pos = enemy.position.clone();
+        const drawIndicatorArrow = (entity, color, label) => {
+            const pos = entity.position.clone();
             pos.project(this.camera);
 
             const screenX = (pos.x * 0.5 + 0.5) * canvas.width;
             const screenY = (-pos.y * 0.5 + 0.5) * canvas.height;
 
-            // Check if enemy is off-screen or behind camera
             const isOffScreen = screenX < 0 || screenX > canvas.width ||
                                 screenY < 0 || screenY > canvas.height || pos.z > 1;
 
             if (!isOffScreen) return;
 
-            // Calculate angle from center of screen to enemy
             const dx = screenX - centerX;
             const dy = screenY - centerY;
             let angle = Math.atan2(dy, dx);
 
-            // If behind camera, flip direction
             if (pos.z > 1) {
                 angle = Math.atan2(-dy, -dx);
             }
 
-            // Place arrow at screen edge
             const edgeX = Math.cos(angle);
             const edgeY = Math.sin(angle);
 
-            // Find where the line hits the screen edge
             const maxExtentX = (canvas.width / 2) - margin;
             const maxExtentY = (canvas.height / 2) - margin;
             const scale = Math.min(
@@ -3363,27 +3680,14 @@ class StarTrekGame {
             const arrowX = centerX + edgeX * scale;
             const arrowY = centerY + edgeY * scale;
 
-            // Distance for sizing/opacity
-            const dist = this.enterprise.position.distanceTo(enemy.position);
+            const dist = this.enterprise.position.distanceTo(entity.position);
             const alpha = Math.max(0.4, Math.min(1.0, 1.0 - (dist - 100) / 500));
 
-            // Color based on enemy type
-            const colors = {
-                klingon: '#ff4444',
-                romulan: '#44ff88',
-                borg: '#88ff88',
-                gorn: '#ffff44',
-                cardassian: '#ffaa44'
-            };
-            const color = colors[enemy.userData.type] || '#ff4444';
-
-            // Draw arrow
             ctx.save();
             ctx.translate(arrowX, arrowY);
             ctx.rotate(angle);
             ctx.globalAlpha = alpha;
 
-            // Arrow shape
             ctx.beginPath();
             ctx.moveTo(18, 0);
             ctx.lineTo(-8, -10);
@@ -3397,14 +3701,34 @@ class StarTrekGame {
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // Distance label
             ctx.rotate(-angle);
             ctx.font = 'bold 10px monospace';
             ctx.fillStyle = color;
             ctx.textAlign = 'center';
-            ctx.fillText(Math.round(dist) + 'm', 0, -16);
+            ctx.fillText(label, 0, -16);
 
             ctx.restore();
+        };
+
+        // Draw enemy indicators
+        const enemyColors = {
+            klingon: '#ff4444',
+            romulan: '#44ff88',
+            borg: '#88ff88',
+            gorn: '#ffff44',
+            cardassian: '#ffaa44'
+        };
+
+        this.enemies.forEach(enemy => {
+            const color = enemyColors[enemy.userData.type] || '#ff4444';
+            const dist = this.enterprise.position.distanceTo(enemy.position);
+            drawIndicatorArrow(enemy, color, Math.round(dist) + 'm');
+        });
+
+        // Draw ally indicators (blue)
+        this.allies.forEach(ally => {
+            const dist = this.enterprise.position.distanceTo(ally.position);
+            drawIndicatorArrow(ally, '#4488ff', Math.round(dist) + 'm');
         });
     }
 
