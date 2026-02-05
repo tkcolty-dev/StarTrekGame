@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Trek: Strange New Worlds - USS Enterprise</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Rajdhani', sans-serif;
+            color: #ffffff;
+        }
+
+        #gameCanvas { display: block; cursor: none; }
+
+        .ui-container { position: fixed; pointer-events: none; }
+        .ui-container > * { pointer-events: auto; }
+
+        /* ============================================ */
+        /* TITLE SCREEN */
+        /* ============================================ */
+        #titleScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        #titleScreen.active { display: flex; }
+
+        .title-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 30px #ffffff, 0 0 60px #888888;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+        .title-subtitle {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: #ff9500;
+            letter-spacing: 8px;
+            margin-bottom: 50px;
+        }
+
+        .mission-select {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        .mission-card {
+            width: 400px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(0,40,80,0.8) 0%, rgba(0,20,40,0.9) 100%);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-left: 4px solid #ff9500;
+            border-radius: 0 10px 10px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .mission-card:hover {
+            background: linear-gradient(135deg, rgba(0,60,120,0.9) 0%, rgba(0,40,80,0.95) 100%);
+            border-color: #ffffff;
+            transform: translateX(10px);
+        }
+        .mission-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+        .mission-desc {
+            font-size: 14px;
+            color: #88ccff;
+        }
+        .mission-info {
+            font-size: 12px;
+            color: #ff9500;
+            margin-top: 8px;
+        }
+
+        .title-buttons {
+            display: flex;
+            gap: 20px;
+        }
+        .title-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, rgba(0,60,120,0.8) 0%, rgba(0,40,80,0.9) 100%);
+            border: 2px solid rgba(255,255,255,0.6);
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .title-btn:hover {
+            background: linear-gradient(135deg, rgba(0,100,200,0.9) 0%, rgba(0,60,120,0.95) 100%);
+            border-color: #ffffff;
+        }
+
+        /* ============================================ */
+        /* SETTINGS PANEL */
+        /* ============================================ */
+        #settingsPanel {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 450px;
+            background: linear-gradient(135deg, rgba(0,30,60,0.95) 0%, rgba(0,20,40,0.98) 100%);
+            border: 2px solid #ff9500;
+            border-radius: 10px;
+            padding: 25px;
+            display: none;
+            z-index: 2500;
+        }
+        #settingsPanel.active { display: block; }
+
+        .settings-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .settings-label {
+            font-size: 14px;
+            color: #88ccff;
+        }
+        .settings-slider {
+            width: 200px;
+            height: 8px;
+            -webkit-appearance: none;
+            background: rgba(0,50,100,0.5);
+            border-radius: 4px;
+            outline: none;
+        }
+        .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #ff9500;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .settings-value {
+            width: 50px;
+            text-align: right;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: #00d4ff;
+        }
+        .settings-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff9500, #ff6600);
+            border: none;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: #000;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        /* ============================================ */
+        /* GAME UI */
+        /* ============================================ */
+        #gameUI { display: none; }
+
+        #topBar {
+            top: 0; left: 0; right: 0;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            background: linear-gradient(180deg, rgba(0,20,40,0.9) 0%, rgba(0,20,40,0.7) 100%);
+            border-bottom: 2px solid #ff9500;
+        }
+        .lcars-bracket {
+            width: 80px; height: 30px;
+            background: linear-gradient(90deg, #ff9500 0%, #ff9500 80%, transparent 80%);
+            border-radius: 15px 0 0 15px;
+            margin-right: 10px;
+        }
+        .lcars-bracket-right {
+            background: linear-gradient(90deg, transparent 20%, #cc6699 20%, #cc6699 100%);
+            border-radius: 0 15px 15px 0;
+            margin-left: 10px; margin-right: 0;
+        }
+        #shipName {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 0 10px #00d4ff;
+            letter-spacing: 2px;
+            flex: 1;
+            text-align: center;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin: 0 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+        .status-green { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        .status-yellow { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
+        .status-red { background: #ff3366; box-shadow: 0 0 8px #ff3366; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        #leftPanel { top: 60px; left: 0; width: 200px; padding: 10px; }
+        .panel-section {
+            background: linear-gradient(135deg, rgba(0,30,60,0.85) 0%, rgba(0,20,40,0.9) 100%);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-left: 3px solid #ff9500;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 8px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #ff9500;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .stat-bar { margin-bottom: 8px; }
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #88ccff;
+        }
+        .stat-value { color: #ffffff; font-weight: 600; }
+        .bar-container {
+            height: 6px;
+            background: rgba(0,50,100,0.5);
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        .bar-hull { background: linear-gradient(90deg, #00ff88, #00cc66); }
+        .bar-shields { background: linear-gradient(90deg, #00d4ff, #0088cc); }
+        .bar-energy { background: linear-gradient(90deg, #ffcc00, #ff9900); }
+        .bar-weapons { background: linear-gradient(90deg, #ff6666, #cc3333); }
+
+        #rightPanel { top: 60px; right: 0; width: 200px; padding: 10px; }
+        .weapon-slot {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            background: rgba(0,40,80,0.6);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            border: 1px solid rgba(255,255,255,0.5);
+            cursor: pointer;
+        }
+        .weapon-slot:hover {
+            background: rgba(0,60,120,0.8);
+            border-color: rgba(255,255,255,0.8);
+        }
+        .weapon-icon {
+            width: 24px; height: 24px;
+            background: #ff6600;
+            border-radius: 4px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .weapon-info { flex: 1; }
+        .weapon-name { font-size: 11px; font-weight: 600; color: #ffffff; }
+        .weapon-damage { font-size: 10px; color: #88ccff; }
+        .weapon-key {
+            width: 20px; height: 20px;
+            background: #ff9500;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #000;
+        }
+
+        #bottomPanel {
+            bottom: 0; left: 0; right: 0;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 15px;
+            background: linear-gradient(0deg, rgba(0,20,40,0.9) 0%, rgba(0,20,40,0.7) 100%);
+            border-top: 2px solid #cc6699;
+        }
+        .throttle-container { display: flex; align-items: center; margin: 0 20px; }
+        .throttle-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            color: #ff9500;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            margin-right: 8px;
+            letter-spacing: 1px;
+        }
+        .throttle-track {
+            width: 150px; height: 24px;
+            background: rgba(0,40,80,0.8);
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.5);
+            overflow: hidden;
+        }
+        .throttle-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.1s ease;
+        }
+        .speed-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #00ff88;
+            text-shadow: 0 0 15px #00ff88;
+            min-width: 120px;
+            text-align: center;
+        }
+        .warp-indicator { font-size: 10px; color: #88ccff; text-align: center; }
+        .nav-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 20px;
+        }
+        .coordinates {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #ffffff;
+        }
+        .coord-label { font-size: 9px; color: #ff9500; margin-top: 3px; }
+
+        #minimap {
+            position: fixed;
+            bottom: 100px; right: 15px;
+            width: 120px; height: 120px;
+            background: radial-gradient(circle, rgba(0,40,80,0.9) 0%, rgba(0,20,40,0.95) 100%);
+            border: 2px solid rgba(255,255,255,0.6);
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        .minimap-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(0,150,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,150,255,0.1) 1px, transparent 1px);
+            background-size: 15px 15px;
+        }
+        .minimap-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px; height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ff88;
+        }
+        #minimapCanvas { width: 100%; height: 100%; }
+
+        #controlsHelp {
+            position: fixed;
+            bottom: 100px; left: 15px;
+            background: rgba(0,30,60,0.85);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 10px;
+        }
+        .control-item { display: flex; align-items: center; margin-bottom: 4px; }
+        .control-key {
+            min-width: 55px;
+            padding: 2px 6px;
+            background: #ff9500;
+            border-radius: 2px;
+            color: #000;
+            font-weight: 600;
+            margin-right: 8px;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8px;
+        }
+        .control-action { color: #88ccff; }
+
+        /* Target Info */
+        #targetInfo {
+            position: fixed;
+            top: 60px; left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 20px;
+            background: rgba(255,51,51,0.8);
+            border: 2px solid #ff3333;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #ffffff;
+            text-align: center;
+            display: none;
+        }
+
+        /* Alert Bar */
+        #alertBar {
+            position: fixed;
+            top: 55px; left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 25px;
+            background: rgba(255,51,102,0.9);
+            border: 2px solid #ff3366;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #ffffff;
+            display: none;
+            animation: alertPulse 1s infinite;
+        }
+        #alertBar.active { display: block; }
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 0 15px #ff3366; }
+            50% { box-shadow: 0 0 30px #ff3366; }
+        }
+
+        /* Crew Dialog */
+        #crewDialog {
+            position: fixed;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            background: linear-gradient(135deg, rgba(0,40,80,0.95) 0%, rgba(0,20,40,0.98) 100%);
+            border: 2px solid #00d4ff;
+            border-left: 4px solid #ff9500;
+            border-radius: 5px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            color: #ffffff;
+            display: none;
+            max-width: 500px;
+            text-align: center;
+            z-index: 1500;
+            pointer-events: none;
+        }
+        #crewDialog.active { display: block; }
+        .crew-name {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            color: #ff9500;
+            margin-right: 8px;
+        }
+
+        /* Systems Status Panel */
+        #systemsPanel {
+            position: fixed;
+            top: 60px;
+            right: 210px;
+            width: 160px;
+            padding: 10px;
+        }
+        .system-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 10px;
+        }
+        .system-name {
+            color: #88ccff;
+        }
+        .system-status {
+            font-family: 'Orbitron', sans-serif;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+        .system-ok { background: #00ff88; color: #000; }
+        .system-warn { background: #ffcc00; color: #000; }
+        .system-crit { background: #ff3366; color: #fff; }
+        .system-offline { background: #333; color: #888; }
+
+        /* Reload indicator */
+        #reloadIndicator {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 20px;
+            background: rgba(255,153,0,0.9);
+            border: 2px solid #ff9500;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #000;
+            display: none;
+        }
+        #reloadIndicator.active { display: block; }
+
+        /* Upgrade Panel */
+        #upgradePanel {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 550px;
+            background: linear-gradient(135deg, rgba(0,30,60,0.95) 0%, rgba(0,20,40,0.98) 100%);
+            border: 2px solid #ff9500;
+            border-radius: 10px;
+            padding: 20px;
+            display: none;
+            z-index: 1000;
+        }
+        #upgradePanel.active { display: block; }
+        .upgrade-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .upgrade-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .upgrade-card {
+            background: rgba(0,40,80,0.6);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 6px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upgrade-card:hover {
+            background: rgba(0,60,120,0.8);
+            border-color: #00d4ff;
+        }
+        .upgrade-card.purchased {
+            border-color: #00ff88;
+            background: rgba(0,100,50,0.3);
+        }
+        .upgrade-name { font-size: 13px; color: #ffffff; margin-bottom: 4px; }
+        .upgrade-desc { font-size: 11px; color: #88ccff; margin-bottom: 8px; }
+        .upgrade-cost { font-size: 13px; color: #ffcc00; font-weight: 600; }
+        .credits-display {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #ffcc00;
+        }
+        .close-btn {
+            position: absolute;
+            top: 12px; right: 12px;
+            width: 26px; height: 26px;
+            background: #ff3366;
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* Game Over */
+        #gameOverScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 2000;
+        }
+        #gameOverScreen.active { display: flex; }
+        .game-over-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 20px;
+        }
+        .victory { color: #00ff88; text-shadow: 0 0 30px #00ff88; }
+        .defeat { color: #ff3366; text-shadow: 0 0 30px #ff3366; }
+        #gameOverStats {
+            font-size: 18px;
+            color: #88ccff;
+            text-align: center;
+            line-height: 1.8;
+        }
+        .restart-btn {
+            padding: 12px 35px;
+            background: linear-gradient(135deg, #ff9500, #ff6600);
+            border: none;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            color: #000;
+            cursor: pointer;
+            margin-top: 25px;
+            margin-right: 15px;
+        }
+        .menu-btn {
+            padding: 12px 35px;
+            background: linear-gradient(135deg, rgba(0,60,120,0.8), rgba(0,40,80,0.9));
+            border: 2px solid rgba(255,255,255,0.6);
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            color: #ffffff;
+            cursor: pointer;
+            margin-top: 25px;
+        }
+
+        /* Loading */
+        #loadingScreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 3000;
+        }
+        #loadingScreen.hidden { display: none; }
+        .loading-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            color: #00d4ff;
+            margin-bottom: 25px;
+        }
+        .loading-bar {
+            width: 280px; height: 4px;
+            background: rgba(0,100,200,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #ff9500);
+            width: 0%;
+            animation: loading 2s ease-out forwards;
+        }
+        @keyframes loading { to { width: 100%; } }
+        .loading-text {
+            margin-top: 18px;
+            font-size: 13px;
+            color: #88ccff;
+        }
+
+        #damageOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 50%, rgba(255,0,0,0.3) 100%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Mouse cursor indicator */
+        #mouseCursor {
+            position: fixed;
+            width: 24px; height: 24px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 60;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        #mouseCursor::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 4px; height: 4px;
+            background: #ffffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 50;
+        }
+        .crosshair-h, .crosshair-v {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.6);
+        }
+        .crosshair-h {
+            width: 20px; height: 2px;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-v {
+            width: 2px; height: 20px;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-dot {
+            position: absolute;
+            width: 4px; height: 4px;
+            background: #ffffff;
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .crosshair-ring {
+            position: absolute;
+            width: 30px; height: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Toggle buttons */
+        #uiToggleBtn, #soundToggleBtn {
+            position: fixed;
+            top: 55px;
+            padding: 6px 12px;
+            background: rgba(0,60,120,0.8);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 4px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            color: #ffffff;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.2s;
+        }
+        #uiToggleBtn { right: 15px; }
+        #soundToggleBtn { right: 55px; }
+        #uiToggleBtn:hover, #soundToggleBtn:hover {
+            background: rgba(0,100,200,0.9);
+            border-color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen">
+        <div class="loading-title">USS ENTERPRISE NCC-1701</div>
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+        <div class="loading-text">Initializing warp core...</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- TITLE SCREEN -->
+    <div id="titleScreen">
+        <div class="title-logo">STAR TREK</div>
+        <div class="title-subtitle">STRANGE NEW WORLDS</div>
+
+        <div class="mission-select">
+            <div class="mission-card" onclick="game.startMission('patrol')">
+                <div class="mission-name">BORDER PATROL</div>
+                <div class="mission-desc">Defend the neutral zone from Klingon raiders</div>
+                <div class="mission-info">5 WAVES • NORMAL DIFFICULTY</div>
+            </div>
+            <div class="mission-card" onclick="game.startMission('rescue')">
+                <div class="mission-name">RESCUE MISSION</div>
+                <div class="mission-desc">Fight through Romulan forces to rescue stranded crew</div>
+                <div class="mission-info">7 WAVES • HARD DIFFICULTY</div>
+            </div>
+            <div class="mission-card" onclick="game.startMission('assault')">
+                <div class="mission-name">DEEP STRIKE</div>
+                <div class="mission-desc">Assault enemy staging area deep in hostile territory</div>
+                <div class="mission-info">10 WAVES • EXPERT DIFFICULTY</div>
+            </div>
+            <div class="mission-card" onclick="game.startMission('survival')">
+                <div class="mission-name">SURVIVAL MODE</div>
+                <div class="mission-desc">Survive endless waves of enemies for as long as possible</div>
+                <div class="mission-info">ENDLESS WAVES</div>
+            </div>
+        </div>
+
+        <div class="title-buttons">
+            <button class="title-btn" onclick="game.openSettings()">SETTINGS</button>
+        </div>
+    </div>
+
+    <!-- SETTINGS PANEL -->
+    <div id="settingsPanel">
+        <div class="settings-title">SETTINGS</div>
+
+        <div class="settings-row">
+            <span class="settings-label">MASTER VOLUME</span>
+            <input type="range" class="settings-slider" min="0" max="100" value="50"
+                   oninput="game.setMasterVolume(this.value/100); document.getElementById('masterVolVal').textContent = this.value + '%'">
+            <span class="settings-value" id="masterVolVal">50%</span>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-label">SFX VOLUME</span>
+            <input type="range" class="settings-slider" min="0" max="100" value="70"
+                   oninput="game.setSfxVolume(this.value/100); document.getElementById('sfxVolVal').textContent = this.value + '%'">
+            <span class="settings-value" id="sfxVolVal">70%</span>
+        </div>
+
+        <div class="settings-row">
+            <span class="settings-label">CAMERA FOLLOW</span>
+            <input type="range" class="settings-slider" min="0" max="1" value="1"
+                   oninput="game.cameraFollowShip = this.value == 1; document.getElementById('camFollowVal').textContent = this.value == 1 ? 'ON' : 'OFF'">
+            <span class="settings-value" id="camFollowVal">ON</span>
+        </div>
+
+        <button class="settings-btn" onclick="game.closeSettings()">CLOSE</button>
+    </div>
+
+    <!-- GAME UI -->
+    <div id="gameUI">
+        <div id="topBar" class="ui-container">
+            <div class="lcars-bracket"></div>
+            <div class="status-indicator">
+                <div class="status-dot status-green" id="statusDot"></div>
+                <span id="statusText">ALL SYSTEMS NOMINAL</span>
+            </div>
+            <div id="shipName">USS ENTERPRISE NCC-1701</div>
+            <div class="status-indicator">
+                <span>WAVE: <span id="waveNumber">1</span></span>
+            </div>
+            <div class="lcars-bracket lcars-bracket-right"></div>
+        </div>
+
+        <div id="leftPanel" class="ui-container">
+            <div class="panel-section">
+                <div class="panel-title">Ship Status</div>
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>HULL</span>
+                        <span class="stat-value" id="hullValue">100%</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill bar-hull" id="hullBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>SHIELDS</span>
+                        <span class="stat-value" id="shieldValue">100%</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill bar-shields" id="shieldBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>ENERGY</span>
+                        <span class="stat-value" id="energyValue">100%</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill bar-energy" id="energyBar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">Weapons</div>
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>PHASERS</span>
+                        <span class="stat-value" id="phaserValue">100%</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill bar-weapons" id="phaserBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>TORPEDOES</span>
+                        <span class="stat-value" id="torpedoValue">10</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill bar-weapons" id="torpedoBar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="rightPanel" class="ui-container">
+            <div class="panel-section">
+                <div class="panel-title">Armament</div>
+                <div class="weapon-slot">
+                    <div class="weapon-icon">P</div>
+                    <div class="weapon-info">
+                        <div class="weapon-name">Phaser Banks</div>
+                        <div class="weapon-damage">DMG: <span id="phaserDmg">25</span></div>
+                    </div>
+                    <div class="weapon-key">1</div>
+                </div>
+                <div class="weapon-slot">
+                    <div class="weapon-icon" style="background:#cc3333;">T</div>
+                    <div class="weapon-info">
+                        <div class="weapon-name">Torpedoes</div>
+                        <div class="weapon-damage">DMG: <span id="torpedoDmg">100</span></div>
+                    </div>
+                    <div class="weapon-key">2</div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">Systems</div>
+                <div class="weapon-slot" onclick="game.toggleShields()">
+                    <div class="weapon-icon" style="background:#00d4ff;">S</div>
+                    <div class="weapon-info">
+                        <div class="weapon-name">Shields</div>
+                        <div class="weapon-damage" id="shieldStatus">ACTIVE</div>
+                    </div>
+                </div>
+                <div class="weapon-slot" onclick="game.openUpgrades()">
+                    <div class="weapon-icon" style="background:#00ff88;">U</div>
+                    <div class="weapon-info">
+                        <div class="weapon-name">Upgrades</div>
+                        <div class="weapon-damage">Credits: <span id="creditsValue">0</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="bottomPanel" class="ui-container">
+            <div class="nav-info">
+                <div class="coordinates" id="coordX">X: 0</div>
+                <div class="coord-label">POSITION</div>
+            </div>
+
+            <div class="throttle-container">
+                <div class="throttle-label">IMPULSE</div>
+                <div class="throttle-track">
+                    <div class="throttle-fill" id="throttleFill" style="width: 0%; background: linear-gradient(90deg, #00ff88, #00d4ff, #ff9500);"></div>
+                </div>
+            </div>
+
+            <div class="nav-info">
+                <div class="speed-display" id="speedDisplay">FULL STOP</div>
+                <div class="warp-indicator" id="warpIndicator">ENGINES IDLE</div>
+            </div>
+
+            <div class="throttle-container">
+                <div class="throttle-label">WARP</div>
+                <div class="throttle-track">
+                    <div class="throttle-fill" id="warpFill" style="width: 0%; background: linear-gradient(90deg, #cc6699, #ff3366);"></div>
+                </div>
+            </div>
+
+            <div class="nav-info">
+                <div class="coordinates" id="coordZ">Z: 0</div>
+                <div class="coord-label">HEADING</div>
+            </div>
+        </div>
+
+        <div id="minimap">
+            <div class="minimap-grid"></div>
+            <canvas id="minimapCanvas"></canvas>
+            <div class="minimap-center"></div>
+        </div>
+
+        <div id="controlsHelp" class="ui-container">
+            <div class="panel-title" style="color: #ff9500; margin-bottom: 6px;">CONTROLS</div>
+            <div class="control-item"><span class="control-key">MOUSE</span><span class="control-action">Steer Ship</span></div>
+            <div class="control-item"><span class="control-key">L-CLICK</span><span class="control-action">Phasers</span></div>
+            <div class="control-item"><span class="control-key">R-CLICK</span><span class="control-action">Torpedoes</span></div>
+            <div class="control-item"><span class="control-key">W / S</span><span class="control-action">Throttle</span></div>
+            <div class="control-item"><span class="control-key">SHIFT</span><span class="control-action">Warp</span></div>
+            <div class="control-item"><span class="control-key">R</span><span class="control-action">Repair (hold)</span></div>
+            <div class="control-item"><span class="control-key">P</span><span class="control-action">Autopilot</span></div>
+        </div>
+
+        <div id="targetInfo"></div>
+        <div id="alertBar"></div>
+        <div id="reloadIndicator"></div>
+        <button id="uiToggleBtn" onclick="game.toggleUI()">H</button>
+        <button id="soundToggleBtn" onclick="game.toggleSound()">M</button>
+    </div>
+
+    <div id="crewDialog"></div>
+    <div id="damageOverlay"></div>
+
+    <div id="mouseCursor"></div>
+
+    <div id="crosshair">
+        <div class="crosshair-ring"></div>
+        <div class="crosshair-h"></div>
+        <div class="crosshair-v"></div>
+        <div class="crosshair-dot"></div>
+    </div>
+
+    <div id="upgradePanel">
+        <button class="close-btn" onclick="game.closeUpgrades()">×</button>
+        <div class="upgrade-title">SHIP UPGRADES</div>
+        <div class="credits-display">CREDITS: <span id="creditsValue">0</span></div>
+        <div class="upgrade-grid" id="upgradeGrid"></div>
+    </div>
+
+    <div id="gameOverScreen">
+        <div class="game-over-title" id="gameOverTitle">MISSION COMPLETE</div>
+        <div id="gameOverStats"></div>
+        <div>
+            <button class="restart-btn" onclick="game.restart()">PLAY AGAIN</button>
+            <button class="menu-btn" onclick="game.returnToTitle()">MAIN MENU</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
