@@ -1498,9 +1498,8 @@ class StarTrekGame {
         // Pick random directions for groups to approach from
         const groupAngles = [];
         for (let g = 0; g < numGroups; g++) {
-            // Spread groups out but not evenly around - pick random sectors
             const baseAngle = (Math.random() * Math.PI * 2);
-            groupAngles.push(baseAngle + g * (Math.PI * 0.6)); // Groups separated by ~108 degrees
+            groupAngles.push(baseAngle + g * (Math.PI * 0.6));
         }
 
         let enemiesSpawned = 0;
@@ -1508,21 +1507,35 @@ class StarTrekGame {
             const groupAngle = groupAngles[g];
             const groupSize = Math.min(enemiesPerGroup, enemyCount - enemiesSpawned);
 
+            // Calculate group leader position
+            const leaderDistance = 550;
+            const leaderX = this.enterprise.position.x + Math.cos(groupAngle) * leaderDistance;
+            const leaderZ = this.enterprise.position.z + Math.sin(groupAngle) * leaderDistance;
+
             for (let i = 0; i < groupSize; i++) {
                 const type = Math.random() > 0.7 && this.wave > 2 ? 'romulan' : 'klingon';
                 const enemy = this.createEnemy(type);
 
-                // Spawn in formation within the group
-                const distance = 500 + Math.random() * 150;
-                const angleSpread = (i - groupSize / 2) * 0.15; // Spread within group
-                const finalAngle = groupAngle + angleSpread;
+                // V-Formation offsets relative to leader
+                const row = Math.floor(i / 2);
+                const side = (i % 2 === 0) ? 1 : -1;
+                const formationX = (i === 0) ? 0 : side * (row + 1) * 25; // Spread sideways
+                const formationZ = row * 35; // Stagger backwards
 
-                // Formation offset (line or V formation)
-                const formationDepth = (i % 3) * 30; // Stagger depth
+                // Rotate formation offset by group angle
+                const cosA = Math.cos(groupAngle);
+                const sinA = Math.sin(groupAngle);
+                const offsetX = formationX * cosA - formationZ * sinA;
+                const offsetZ = formationX * sinA + formationZ * cosA;
 
-                enemy.position.x = this.enterprise.position.x + Math.cos(finalAngle) * (distance + formationDepth);
-                enemy.position.y = (Math.random() - 0.5) * 20;
-                enemy.position.z = this.enterprise.position.z + Math.sin(finalAngle) * (distance + formationDepth);
+                enemy.position.x = leaderX + offsetX;
+                enemy.position.y = (Math.random() - 0.5) * 10;
+                enemy.position.z = leaderZ + offsetZ;
+
+                // Store formation data for maintaining formation during movement
+                enemy.userData.groupId = g;
+                enemy.userData.formationOffset = new THREE.Vector3(offsetX, 0, offsetZ);
+                enemy.userData.isLeader = (i === 0);
 
                 this.enemies.push(enemy);
                 this.scene.add(enemy);
@@ -2678,7 +2691,15 @@ class StarTrekGame {
         // Update target lock
         this.updateTargetLock();
 
-        // Update enemies - slower, less maneuverable movement
+        // Update enemies - formation-based movement
+        // First, find group leaders and move them
+        const groupLeaders = {};
+        this.enemies.forEach(enemy => {
+            if (enemy.userData.isLeader) {
+                groupLeaders[enemy.userData.groupId] = enemy;
+            }
+        });
+
         this.enemies.forEach(enemy => {
             const toPlayer = this.enterprise.position.clone().sub(enemy.position);
             const distance = toPlayer.length();
@@ -2686,28 +2707,47 @@ class StarTrekGame {
             // Announce enemy when in range
             this.announceEnemy(enemy);
 
-            // Slow turn towards player (less maneuverable)
+            // Turn towards player
             const targetQuat = new THREE.Quaternion();
             const lookMatrix = new THREE.Matrix4().lookAt(enemy.position, this.enterprise.position, new THREE.Vector3(0, 1, 0));
             targetQuat.setFromRotationMatrix(lookMatrix);
-            enemy.quaternion.slerp(targetQuat, enemy.userData.turnSpeed || 0.01);
+            enemy.quaternion.slerp(targetQuat, enemy.userData.turnSpeed || 0.02);
 
-            // Slow approach - enemies are big attack ships, not nimble fighters
-            if (distance > 100) {
-                // Approach slowly from far away
-                const moveDir = toPlayer.clone().normalize();
-                enemy.position.add(moveDir.multiplyScalar(enemy.userData.speed));
-            } else if (distance > 60) {
-                // Slow down as they get closer for attack runs
-                const moveDir = toPlayer.clone().normalize();
-                enemy.position.add(moveDir.multiplyScalar(enemy.userData.speed * 0.5));
-            } else if (distance < 40) {
-                // Very slow circling at close range
-                const perpendicular = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
-                enemy.position.add(perpendicular.multiplyScalar(enemy.userData.speed * 0.3));
+            if (enemy.userData.isLeader) {
+                // Leader moves toward player, others follow
+                if (distance > 150) {
+                    const moveDir = toPlayer.clone().normalize();
+                    enemy.position.add(moveDir.multiplyScalar(enemy.userData.speed));
+                } else if (distance > 80) {
+                    const moveDir = toPlayer.clone().normalize();
+                    enemy.position.add(moveDir.multiplyScalar(enemy.userData.speed * 0.5));
+                } else {
+                    // Circle at close range
+                    const perpendicular = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
+                    enemy.position.add(perpendicular.multiplyScalar(enemy.userData.speed * 0.4));
+                }
+            } else {
+                // Wingmen maintain formation relative to their leader
+                const leader = groupLeaders[enemy.userData.groupId];
+                if (leader) {
+                    // Calculate desired position based on leader + formation offset
+                    const desiredPos = leader.position.clone().add(enemy.userData.formationOffset);
+                    const toDesired = desiredPos.clone().sub(enemy.position);
+
+                    // Smoothly move toward formation position
+                    if (toDesired.length() > 5) {
+                        enemy.position.add(toDesired.normalize().multiplyScalar(enemy.userData.speed * 1.2));
+                    }
+                } else {
+                    // No leader, move independently
+                    if (distance > 100) {
+                        const moveDir = toPlayer.clone().normalize();
+                        enemy.position.add(moveDir.multiplyScalar(enemy.userData.speed));
+                    }
+                }
             }
 
-            // Fire at player when in range - longer range combat
+            // Fire at player when in range
             const now = Date.now();
             if (distance < 400 && now - enemy.userData.lastFire > enemy.userData.fireRate) {
                 enemy.userData.lastFire = now;
