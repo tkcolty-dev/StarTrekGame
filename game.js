@@ -89,7 +89,7 @@ class StarTrekGame {
 
         // Mouse flight controls
         this.mouseFlightEnabled = true;
-        this.mouseSensitivity = 0.003;
+        this.mouseSensitivity = 0.006; // Easier to control
         this.autopilotEnabled = false;
 
         this.phaserCooldown = 0;
@@ -1245,8 +1245,8 @@ class StarTrekGame {
             const dist = toEnemy.length();
             const angle = shipForward.angleTo(toEnemy.normalize());
 
-            // Only target enemies in front (within 90 degrees) and within range
-            if (dist < 300 && angle < Math.PI / 2) {
+            // Only target enemies in front (within 90 degrees) and within range - long range targeting
+            if (dist < 600 && angle < Math.PI / 2) {
                 if (dist < nearestDist) {
                     nearestDist = dist;
                     nearest = enemy;
@@ -1336,18 +1336,19 @@ class StarTrekGame {
     createEnemy(type = 'klingon') {
         const enemy = new THREE.Group();
 
-        // Klingon Bird of Prey - BIG, SLOW, tanky attack ships
-        // Romulan Warbirds - medium speed, cloaking
+        // Klingon Bird of Prey and Romulan Warbirds - with shields
         enemy.userData = {
             type: type,
-            health: type === 'klingon' ? 200 : 180,
-            maxHealth: type === 'klingon' ? 200 : 180,
-            speed: type === 'klingon' ? 0.3 : 0.4, // Much slower
-            turnSpeed: type === 'klingon' ? 0.01 : 0.015, // Less maneuverable
-            damage: type === 'klingon' ? 8 : 12,
-            fireRate: type === 'klingon' ? 2500 : 3500,
+            health: type === 'klingon' ? 120 : 100,
+            maxHealth: type === 'klingon' ? 120 : 100,
+            shields: type === 'klingon' ? 80 : 100,
+            maxShields: type === 'klingon' ? 80 : 100,
+            speed: type === 'klingon' ? 0.4 : 0.5,
+            turnSpeed: type === 'klingon' ? 0.015 : 0.02,
+            damage: type === 'klingon' ? 6 : 10,
+            fireRate: type === 'klingon' ? 3000 : 4000,
             lastFire: 0,
-            credits: type === 'klingon' ? 150 : 250,
+            credits: type === 'klingon' ? 100 : 175,
             announced: false
         };
 
@@ -1462,9 +1463,22 @@ class StarTrekGame {
             enemy.add(glow);
         }
 
-        // Klingon ships are bigger attack vessels, Romulans medium-sized
-        const scale = type === 'klingon' ? 0.8 : 0.6;
+        // Smaller, more numerous enemy ships
+        const scale = type === 'klingon' ? 0.45 : 0.35;
         enemy.scale.set(scale, scale, scale);
+
+        // Add shield mesh to enemy
+        const shieldGeom = new THREE.SphereGeometry(15, 16, 16);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: type === 'klingon' ? 0x44ff44 : 0x44ff88,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
+        });
+        const shieldMesh = new THREE.Mesh(shieldGeom, shieldMat);
+        enemy.add(shieldMesh);
+        enemy.userData.shieldMesh = shieldMesh;
+
         return enemy;
     }
 
@@ -1472,7 +1486,7 @@ class StarTrekGame {
         if (!this.gameStarted) return;
 
         const difficulty = this.currentMission ? this.missions[this.currentMission].difficulty : 1;
-        const enemyCount = Math.floor((2 + this.wave * 1.2) * difficulty);
+        const enemyCount = Math.floor((4 + this.wave * 2) * difficulty); // More enemies
 
         // Reset announced enemies for new wave
         this.announcedEnemies.clear();
@@ -1517,24 +1531,52 @@ class StarTrekGame {
         const now = Date.now();
         if (now - this.lastCrewDialog < this.crewDialogCooldown) {
             // Queue it for later
-            this.crewDialogQueue.push({ crewMember, message });
+            if (this.crewDialogQueue.length < 5) {
+                this.crewDialogQueue.push({ crewMember, message });
+            }
             return;
         }
 
         this.lastCrewDialog = now;
         this.playCrewVoiceSound();
 
-        const dialogBox = document.getElementById('crewDialog');
-        if (dialogBox) {
-            dialogBox.innerHTML = `<span class="crew-name">${crewMember}:</span> "${message}"`;
-            dialogBox.classList.add('active');
-            dialogBox.style.display = 'block'; // Force display
-            setTimeout(() => {
-                dialogBox.classList.remove('active');
-                dialogBox.style.display = 'none';
-            }, 4000);
+        // Create or get dialog box
+        let dialogBox = document.getElementById('crewDialog');
+        if (!dialogBox) {
+            dialogBox = document.createElement('div');
+            dialogBox.id = 'crewDialog';
+            dialogBox.style.cssText = `
+                position: fixed;
+                bottom: 200px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 15px 30px;
+                background: linear-gradient(135deg, rgba(0,40,80,0.95) 0%, rgba(0,20,40,0.98) 100%);
+                border: 2px solid #00d4ff;
+                border-left: 4px solid #ff9500;
+                border-radius: 5px;
+                font-family: 'Rajdhani', sans-serif;
+                font-size: 18px;
+                color: #ffffff;
+                max-width: 600px;
+                text-align: center;
+                z-index: 9999;
+                pointer-events: none;
+            `;
+            document.body.appendChild(dialogBox);
         }
-        console.log(`CREW: ${crewMember}: ${message}`);
+
+        dialogBox.innerHTML = `<span style="font-family: 'Orbitron', sans-serif; font-weight: 700; color: #ff9500; margin-right: 8px;">${crewMember}:</span> "${message}"`;
+        dialogBox.style.display = 'block';
+
+        // Clear any existing timeout
+        if (this.crewDialogTimeout) {
+            clearTimeout(this.crewDialogTimeout);
+        }
+
+        this.crewDialogTimeout = setTimeout(() => {
+            dialogBox.style.display = 'none';
+        }, 4000);
     }
 
     processCrewDialogQueue() {
@@ -1568,16 +1610,18 @@ class StarTrekGame {
         if (this.announcedEnemies.has(enemy)) return;
 
         const distance = this.enterprise.position.distanceTo(enemy.position);
-        if (distance < 300 && !enemy.userData.announced) {
+        if (distance < 500 && !enemy.userData.announced) {
             enemy.userData.announced = true;
             this.announcedEnemies.add(enemy);
 
             const enemyName = enemy.userData.type === 'klingon' ? 'Klingon Bird of Prey' : 'Romulan Warbird';
+            const bearing = Math.floor(Math.random() * 360);
+            const mark = Math.floor(Math.random() * 90);
             const messages = [
-                `${enemyName} bearing ${Math.floor(Math.random() * 360)} mark ${Math.floor(Math.random() * 90)}!`,
-                `${enemyName} on approach vector!`,
-                `Hostile ${enemyName} detected ahead!`,
-                `${enemyName} closing fast, Captain!`
+                `${enemyName} bearing ${bearing} mark ${mark}!`,
+                `${enemyName} on attack vector, ${Math.floor(distance)} meters!`,
+                `Hostile ${enemyName} detected, shields are up!`,
+                `${enemyName} closing to weapons range!`
             ];
             this.showCrewDialog('SULU', messages[Math.floor(Math.random() * messages.length)]);
         }
@@ -1961,14 +2005,14 @@ class StarTrekGame {
         const start = this.enterprise.position.clone();
         let end;
 
-        // If we have a target lock, fire at target
+        // If we have a target lock, fire at target - extended range
         if (this.targetLocked) {
             const direction = this.targetLocked.position.clone().sub(start).normalize();
-            end = start.clone().add(direction.multiplyScalar(300));
+            end = start.clone().add(direction.multiplyScalar(500));
         } else {
             const direction = new THREE.Vector3(0, 0, -1);
             direction.applyQuaternion(this.enterprise.quaternion);
-            end = start.clone().add(direction.multiplyScalar(300));
+            end = start.clone().add(direction.multiplyScalar(500));
         }
 
         const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
@@ -2077,15 +2121,41 @@ class StarTrekGame {
     }
 
     damageEnemy(enemy, damage) {
-        enemy.userData.health -= damage;
+        // Enemy shields absorb damage first
+        if (enemy.userData.shields > 0) {
+            const shieldDamage = Math.min(damage, enemy.userData.shields);
+            enemy.userData.shields -= shieldDamage;
+            damage -= shieldDamage;
 
-        enemy.traverse(child => {
-            if (child.isMesh && child.material.color) {
-                const originalColor = child.material.color.getHex();
-                child.material.color.setHex(0xff0000);
-                setTimeout(() => child.material.color.setHex(originalColor), 100);
+            // Show enemy shield hit effect
+            if (enemy.userData.shieldMesh) {
+                enemy.userData.shieldMesh.material.opacity = 0.5;
+                setTimeout(() => {
+                    if (enemy.userData.shieldMesh) {
+                        enemy.userData.shieldMesh.material.opacity = 0;
+                    }
+                }, 150);
             }
-        });
+
+            // Announce when enemy shields go down
+            if (enemy.userData.shields <= 0 && shieldDamage > 0) {
+                this.showCrewDialog('SPOCK', `Enemy shields have failed, Captain.`);
+            }
+        }
+
+        // Remaining damage hits hull
+        if (damage > 0) {
+            enemy.userData.health -= damage;
+
+            // Flash red when hull is hit
+            enemy.traverse(child => {
+                if (child.isMesh && child.material.color && child !== enemy.userData.shieldMesh) {
+                    const originalColor = child.material.color.getHex();
+                    child.material.color.setHex(0xff0000);
+                    setTimeout(() => child.material.color.setHex(originalColor), 100);
+                }
+            });
+        }
 
         if (enemy.userData.health <= 0) {
             this.destroyEnemy(enemy);
@@ -2602,9 +2672,9 @@ class StarTrekGame {
                 enemy.position.add(perpendicular.multiplyScalar(enemy.userData.speed * 0.3));
             }
 
-            // Fire at player when in range
+            // Fire at player when in range - longer range combat
             const now = Date.now();
-            if (distance < 250 && now - enemy.userData.lastFire > enemy.userData.fireRate) {
+            if (distance < 400 && now - enemy.userData.lastFire > enemy.userData.fireRate) {
                 enemy.userData.lastFire = now;
                 this.enemyFire(enemy);
             }
