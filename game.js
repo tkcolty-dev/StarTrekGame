@@ -226,6 +226,129 @@ class StarTrekGame {
         this.warpOscillator.start();
     }
 
+    startCombatMusic() {
+        if (!this.audioCtx || this.combatMusicPlaying) return;
+        this.combatMusicPlaying = true;
+
+        // Create music gain node
+        this.musicGain = this.audioCtx.createGain();
+        this.musicGain.gain.value = 0.15 * this.musicVolume;
+        this.musicGain.connect(this.masterGain);
+
+        // Deep bass drum pattern
+        this.musicInterval = setInterval(() => {
+            if (!this.gameStarted || !this.soundEnabled) return;
+
+            const t = this.audioCtx.currentTime;
+
+            // Kick drum
+            const kick = this.audioCtx.createOscillator();
+            const kickGain = this.audioCtx.createGain();
+            kick.type = 'sine';
+            kick.frequency.setValueAtTime(150, t);
+            kick.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+            kickGain.gain.setValueAtTime(0.4 * this.musicVolume, t);
+            kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+            kick.connect(kickGain);
+            kickGain.connect(this.masterGain);
+            kick.start(t);
+            kick.stop(t + 0.2);
+
+            // Tense synth stab on some beats
+            if (Math.random() > 0.5) {
+                const synth = this.audioCtx.createOscillator();
+                const synthGain = this.audioCtx.createGain();
+                const synthFilter = this.audioCtx.createBiquadFilter();
+                synth.type = 'sawtooth';
+                const notes = [55, 65.4, 73.4, 82.4, 98]; // Dm scale bass notes
+                synth.frequency.value = notes[Math.floor(Math.random() * notes.length)];
+                synthFilter.type = 'lowpass';
+                synthFilter.frequency.value = 400;
+                synthGain.gain.setValueAtTime(0.15 * this.musicVolume, t);
+                synthGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                synth.connect(synthFilter);
+                synthFilter.connect(synthGain);
+                synthGain.connect(this.masterGain);
+                synth.start(t);
+                synth.stop(t + 0.3);
+            }
+        }, 500); // Beat every 500ms = 120 BPM
+
+        // Tension drone
+        this.droneOsc = this.audioCtx.createOscillator();
+        this.droneOsc2 = this.audioCtx.createOscillator();
+        this.droneGain = this.audioCtx.createGain();
+        const droneFilter = this.audioCtx.createBiquadFilter();
+
+        this.droneOsc.type = 'sawtooth';
+        this.droneOsc.frequency.value = 55; // Low A
+        this.droneOsc2.type = 'sawtooth';
+        this.droneOsc2.frequency.value = 55.5; // Slightly detuned for tension
+
+        droneFilter.type = 'lowpass';
+        droneFilter.frequency.value = 200;
+        droneFilter.Q.value = 2;
+
+        this.droneGain.gain.value = 0.08 * this.musicVolume;
+
+        this.droneOsc.connect(droneFilter);
+        this.droneOsc2.connect(droneFilter);
+        droneFilter.connect(this.droneGain);
+        this.droneGain.connect(this.masterGain);
+
+        this.droneOsc.start();
+        this.droneOsc2.start();
+
+        // High tension strings (occasional)
+        this.stringInterval = setInterval(() => {
+            if (!this.gameStarted || !this.soundEnabled) return;
+
+            const t = this.audioCtx.currentTime;
+            const stringOsc = this.audioCtx.createOscillator();
+            const stringGain = this.audioCtx.createGain();
+            const stringFilter = this.audioCtx.createBiquadFilter();
+
+            stringOsc.type = 'triangle';
+            const highNotes = [220, 261.6, 293.7, 329.6]; // High tension notes
+            stringOsc.frequency.value = highNotes[Math.floor(Math.random() * highNotes.length)];
+
+            stringFilter.type = 'bandpass';
+            stringFilter.frequency.value = 800;
+            stringFilter.Q.value = 1;
+
+            stringGain.gain.setValueAtTime(0, t);
+            stringGain.gain.linearRampToValueAtTime(0.06 * this.musicVolume, t + 0.5);
+            stringGain.gain.linearRampToValueAtTime(0, t + 2);
+
+            stringOsc.connect(stringFilter);
+            stringFilter.connect(stringGain);
+            stringGain.connect(this.masterGain);
+
+            stringOsc.start(t);
+            stringOsc.stop(t + 2);
+        }, 3000);
+    }
+
+    stopCombatMusic() {
+        this.combatMusicPlaying = false;
+        if (this.musicInterval) {
+            clearInterval(this.musicInterval);
+            this.musicInterval = null;
+        }
+        if (this.stringInterval) {
+            clearInterval(this.stringInterval);
+            this.stringInterval = null;
+        }
+        if (this.droneOsc) {
+            this.droneOsc.stop();
+            this.droneOsc = null;
+        }
+        if (this.droneOsc2) {
+            this.droneOsc2.stop();
+            this.droneOsc2 = null;
+        }
+    }
+
     updateEngineSound() {
         if (!this.audioCtx || !this.engineLayers) return;
 
@@ -1832,6 +1955,7 @@ class StarTrekGame {
         document.getElementById('gameUI').style.display = 'block';
 
         this.spawnWave();
+        this.startCombatMusic();
     }
 
     openSettings() {
@@ -2464,6 +2588,7 @@ class StarTrekGame {
     gameOver(victory) {
         this.isGameOver = true;
         this.gameStarted = false;
+        this.stopCombatMusic();
 
         const screen = document.getElementById('gameOverScreen');
         const title = document.getElementById('gameOverTitle');
