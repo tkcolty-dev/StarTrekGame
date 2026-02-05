@@ -89,7 +89,7 @@ class StarTrekGame {
 
         // Mouse flight controls
         this.mouseFlightEnabled = true;
-        this.mouseSensitivity = 0.006; // Easier to control
+        this.mouseSensitivity = 0.012; // Very responsive controls
         this.autopilotEnabled = false;
 
         this.phaserCooldown = 0;
@@ -1245,8 +1245,8 @@ class StarTrekGame {
             const dist = toEnemy.length();
             const angle = shipForward.angleTo(toEnemy.normalize());
 
-            // Only target enemies in front (within 90 degrees) and within range - long range targeting
-            if (dist < 600 && angle < Math.PI / 2) {
+            // Only target enemies in front (within 90 degrees) and within range - very long range targeting
+            if (dist < 1000 && angle < Math.PI / 2) {
                 if (dist < nearestDist) {
                     nearestDist = dist;
                     nearest = enemy;
