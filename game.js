@@ -230,123 +230,142 @@ class StarTrekGame {
         if (!this.audioCtx || this.combatMusicPlaying) return;
         this.combatMusicPlaying = true;
 
-        // Create music gain node
-        this.musicGain = this.audioCtx.createGain();
-        this.musicGain.gain.value = 0.15 * this.musicVolume;
-        this.musicGain.connect(this.masterGain);
+        const vol = this.musicVolume;
 
-        // Deep bass drum pattern
-        this.musicInterval = setInterval(() => {
+        // Star Trek style orchestral combat music
+        // Timpani/percussion hits
+        this.timpaniInterval = setInterval(() => {
             if (!this.gameStarted || !this.soundEnabled) return;
-
             const t = this.audioCtx.currentTime;
 
-            // Kick drum
-            const kick = this.audioCtx.createOscillator();
-            const kickGain = this.audioCtx.createGain();
-            kick.type = 'sine';
-            kick.frequency.setValueAtTime(150, t);
-            kick.frequency.exponentialRampToValueAtTime(30, t + 0.15);
-            kickGain.gain.setValueAtTime(0.4 * this.musicVolume, t);
-            kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-            kick.connect(kickGain);
-            kickGain.connect(this.masterGain);
-            kick.start(t);
-            kick.stop(t + 0.2);
+            // Timpani hit
+            const timpani = this.audioCtx.createOscillator();
+            const timpaniGain = this.audioCtx.createGain();
+            timpani.type = 'sine';
+            timpani.frequency.setValueAtTime(80, t);
+            timpani.frequency.exponentialRampToValueAtTime(50, t + 0.3);
+            timpaniGain.gain.setValueAtTime(0.3 * vol, t);
+            timpaniGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            timpani.connect(timpaniGain);
+            timpaniGain.connect(this.masterGain);
+            timpani.start(t);
+            timpani.stop(t + 0.4);
+        }, 800);
 
-            // Tense synth stab on some beats
-            if (Math.random() > 0.5) {
-                const synth = this.audioCtx.createOscillator();
-                const synthGain = this.audioCtx.createGain();
-                const synthFilter = this.audioCtx.createBiquadFilter();
-                synth.type = 'sawtooth';
-                const notes = [55, 65.4, 73.4, 82.4, 98]; // Dm scale bass notes
-                synth.frequency.value = notes[Math.floor(Math.random() * notes.length)];
-                synthFilter.type = 'lowpass';
-                synthFilter.frequency.value = 400;
-                synthGain.gain.setValueAtTime(0.15 * this.musicVolume, t);
-                synthGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-                synth.connect(synthFilter);
-                synthFilter.connect(synthGain);
-                synthGain.connect(this.masterGain);
-                synth.start(t);
-                synth.stop(t + 0.3);
-            }
-        }, 500); // Beat every 500ms = 120 BPM
-
-        // Tension drone
-        this.droneOsc = this.audioCtx.createOscillator();
-        this.droneOsc2 = this.audioCtx.createOscillator();
-        this.droneGain = this.audioCtx.createGain();
-        const droneFilter = this.audioCtx.createBiquadFilter();
-
-        this.droneOsc.type = 'sawtooth';
-        this.droneOsc.frequency.value = 55; // Low A
-        this.droneOsc2.type = 'sawtooth';
-        this.droneOsc2.frequency.value = 55.5; // Slightly detuned for tension
-
-        droneFilter.type = 'lowpass';
-        droneFilter.frequency.value = 200;
-        droneFilter.Q.value = 2;
-
-        this.droneGain.gain.value = 0.08 * this.musicVolume;
-
-        this.droneOsc.connect(droneFilter);
-        this.droneOsc2.connect(droneFilter);
-        droneFilter.connect(this.droneGain);
-        this.droneGain.connect(this.masterGain);
-
-        this.droneOsc.start();
-        this.droneOsc2.start();
-
-        // High tension strings (occasional)
-        this.stringInterval = setInterval(() => {
+        // Brass fanfare/French horn swells
+        this.brassInterval = setInterval(() => {
             if (!this.gameStarted || !this.soundEnabled) return;
-
             const t = this.audioCtx.currentTime;
-            const stringOsc = this.audioCtx.createOscillator();
-            const stringGain = this.audioCtx.createGain();
-            const stringFilter = this.audioCtx.createBiquadFilter();
 
-            stringOsc.type = 'triangle';
-            const highNotes = [220, 261.6, 293.7, 329.6]; // High tension notes
-            stringOsc.frequency.value = highNotes[Math.floor(Math.random() * highNotes.length)];
+            // Heroic brass chord (stacked fifths like Star Trek)
+            const brassNotes = [
+                [130.8, 196, 261.6], // C major
+                [146.8, 220, 293.7], // D major
+                [164.8, 246.9, 329.6], // E minor
+                [174.6, 261.6, 349.2]  // F major
+            ];
+            const chord = brassNotes[Math.floor(Math.random() * brassNotes.length)];
 
-            stringFilter.type = 'bandpass';
-            stringFilter.frequency.value = 800;
-            stringFilter.Q.value = 1;
+            chord.forEach((freq, i) => {
+                const brass = this.audioCtx.createOscillator();
+                const brassGain = this.audioCtx.createGain();
+                const brassFilter = this.audioCtx.createBiquadFilter();
 
-            stringGain.gain.setValueAtTime(0, t);
-            stringGain.gain.linearRampToValueAtTime(0.06 * this.musicVolume, t + 0.5);
-            stringGain.gain.linearRampToValueAtTime(0, t + 2);
+                brass.type = 'sawtooth';
+                brass.frequency.value = freq;
 
-            stringOsc.connect(stringFilter);
-            stringFilter.connect(stringGain);
-            stringGain.connect(this.masterGain);
+                brassFilter.type = 'lowpass';
+                brassFilter.frequency.setValueAtTime(300, t);
+                brassFilter.frequency.linearRampToValueAtTime(1200, t + 0.3);
+                brassFilter.frequency.linearRampToValueAtTime(400, t + 1.5);
 
-            stringOsc.start(t);
-            stringOsc.stop(t + 2);
-        }, 3000);
+                brassGain.gain.setValueAtTime(0, t);
+                brassGain.gain.linearRampToValueAtTime(0.08 * vol, t + 0.2);
+                brassGain.gain.setValueAtTime(0.06 * vol, t + 1);
+                brassGain.gain.linearRampToValueAtTime(0, t + 2);
+
+                brass.connect(brassFilter);
+                brassFilter.connect(brassGain);
+                brassGain.connect(this.masterGain);
+                brass.start(t + i * 0.05);
+                brass.stop(t + 2);
+            });
+        }, 4000);
+
+        // Strings - sustained tension
+        this.stringsOscs = [];
+        const stringNotes = [130.8, 164.8, 196]; // C, E, G - sustained chord
+        stringNotes.forEach(freq => {
+            const str = this.audioCtx.createOscillator();
+            const strGain = this.audioCtx.createGain();
+            const strFilter = this.audioCtx.createBiquadFilter();
+
+            str.type = 'triangle';
+            str.frequency.value = freq;
+
+            strFilter.type = 'lowpass';
+            strFilter.frequency.value = 600;
+
+            strGain.gain.value = 0.04 * vol;
+
+            str.connect(strFilter);
+            strFilter.connect(strGain);
+            strGain.connect(this.masterGain);
+            str.start();
+
+            this.stringsOscs.push({ osc: str, gain: strGain });
+        });
+
+        // Heroic melody fragments (like TNG theme)
+        this.melodyInterval = setInterval(() => {
+            if (!this.gameStarted || !this.soundEnabled) return;
+            const t = this.audioCtx.currentTime;
+
+            // Star Trek style ascending melody
+            const melodies = [
+                [261.6, 329.6, 392, 523.2], // C E G C (heroic rise)
+                [293.7, 349.2, 440, 587.3], // D F A D
+                [261.6, 311.1, 392, 466.2], // C Eb G Bb (tension)
+            ];
+            const melody = melodies[Math.floor(Math.random() * melodies.length)];
+
+            melody.forEach((freq, i) => {
+                const note = this.audioCtx.createOscillator();
+                const noteGain = this.audioCtx.createGain();
+                const noteFilter = this.audioCtx.createBiquadFilter();
+
+                note.type = 'triangle';
+                note.frequency.value = freq;
+
+                noteFilter.type = 'lowpass';
+                noteFilter.frequency.value = 2000;
+
+                const startTime = t + i * 0.25;
+                noteGain.gain.setValueAtTime(0, startTime);
+                noteGain.gain.linearRampToValueAtTime(0.1 * vol, startTime + 0.05);
+                noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+
+                note.connect(noteFilter);
+                noteFilter.connect(noteGain);
+                noteGain.connect(this.masterGain);
+                note.start(startTime);
+                note.stop(startTime + 0.5);
+            });
+        }, 6000);
     }
 
     stopCombatMusic() {
         this.combatMusicPlaying = false;
-        if (this.musicInterval) {
-            clearInterval(this.musicInterval);
-            this.musicInterval = null;
+        if (this.timpaniInterval) clearInterval(this.timpaniInterval);
+        if (this.brassInterval) clearInterval(this.brassInterval);
+        if (this.melodyInterval) clearInterval(this.melodyInterval);
+        if (this.stringsOscs) {
+            this.stringsOscs.forEach(s => s.osc.stop());
+            this.stringsOscs = null;
         }
-        if (this.stringInterval) {
-            clearInterval(this.stringInterval);
-            this.stringInterval = null;
-        }
-        if (this.droneOsc) {
-            this.droneOsc.stop();
-            this.droneOsc = null;
-        }
-        if (this.droneOsc2) {
-            this.droneOsc2.stop();
-            this.droneOsc2 = null;
-        }
+        this.timpaniInterval = null;
+        this.brassInterval = null;
+        this.melodyInterval = null;
     }
 
     updateEngineSound() {
@@ -1459,141 +1478,162 @@ class StarTrekGame {
     createEnemy(type = 'klingon') {
         const enemy = new THREE.Group();
 
-        // Klingon Bird of Prey and Romulan Warbirds - with shields
+        // Enemy stats by type
+        const enemyStats = {
+            klingon: { health: 120, shields: 120, speed: 0.4, turnSpeed: 0.015, damage: 30, fireRate: 2500, credits: 100, scale: 0.45, shieldColor: 0x44ff44 },
+            romulan: { health: 100, shields: 100, speed: 0.5, turnSpeed: 0.02, damage: 25, fireRate: 3000, credits: 150, scale: 0.4, shieldColor: 0x44ff88 },
+            borg: { health: 300, shields: 200, speed: 0.2, turnSpeed: 0.008, damage: 50, fireRate: 4000, credits: 400, scale: 0.6, shieldColor: 0x88ff88, regenerates: true },
+            gorn: { health: 80, shields: 60, speed: 0.7, turnSpeed: 0.03, damage: 20, fireRate: 1500, credits: 80, scale: 0.35, shieldColor: 0xffff44 },
+            cardassian: { health: 150, shields: 150, speed: 0.35, turnSpeed: 0.012, damage: 35, fireRate: 3500, credits: 200, scale: 0.5, shieldColor: 0xffaa44 }
+        };
+
+        const stats = enemyStats[type] || enemyStats.klingon;
         enemy.userData = {
             type: type,
-            health: type === 'klingon' ? 120 : 100,
-            maxHealth: type === 'klingon' ? 120 : 100,
-            shields: type === 'klingon' ? 120 : 100,
-            maxShields: type === 'klingon' ? 120 : 100,
-            speed: type === 'klingon' ? 0.4 : 0.5,
-            turnSpeed: type === 'klingon' ? 0.015 : 0.02,
-            damage: type === 'klingon' ? 30 : 20,
-            fireRate: type === 'klingon' ? 2500 : 3500,
+            health: stats.health,
+            maxHealth: stats.health,
+            shields: stats.shields,
+            maxShields: stats.shields,
+            speed: stats.speed,
+            turnSpeed: stats.turnSpeed,
+            damage: stats.damage,
+            fireRate: stats.fireRate,
             lastFire: 0,
-            credits: type === 'klingon' ? 100 : 175,
-            announced: false
+            credits: stats.credits,
+            announced: false,
+            regenerates: stats.regenerates || false
         };
 
         if (type === 'klingon') {
-            // Klingon Bird of Prey - MUCH BIGGER MODEL
+            // Klingon Bird of Prey
             const bodyMat = new THREE.MeshPhongMaterial({ color: 0x2a4a2a, specular: 0x224422 });
             const darkMat = new THREE.MeshPhongMaterial({ color: 0x1a2a1a });
             const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff44 });
 
-            // Main hull - larger
             const bodyGeom = new THREE.ConeGeometry(5, 16, 8);
             bodyGeom.rotateX(Math.PI / 2);
-            const body = new THREE.Mesh(bodyGeom, bodyMat);
-            enemy.add(body);
+            enemy.add(new THREE.Mesh(bodyGeom, bodyMat));
 
-            // Command pod on top
-            const podGeom = new THREE.SphereGeometry(3, 16, 12);
-            const pod = new THREE.Mesh(podGeom, bodyMat);
+            const pod = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 12), bodyMat);
             pod.position.set(0, 2, -4);
             enemy.add(pod);
 
-            // Bridge windows
-            const windowGeom = new THREE.BoxGeometry(4, 0.5, 1);
-            const windowMat = new THREE.MeshBasicMaterial({ color: 0x88ff88, transparent: true, opacity: 0.7 });
-            const bridgeWindow = new THREE.Mesh(windowGeom, windowMat);
-            bridgeWindow.position.set(0, 3, -5);
-            enemy.add(bridgeWindow);
-
-            // Large sweeping wings
             for (let side = -1; side <= 1; side += 2) {
-                // Main wing
-                const wingGeom = new THREE.BoxGeometry(20, 1, 8);
-                const wing = new THREE.Mesh(wingGeom, bodyMat);
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 8), bodyMat);
                 wing.position.set(side * 10, 0, 3);
                 wing.rotation.z = side * 0.25;
                 enemy.add(wing);
 
-                // Wing tip - disruptor cannon
-                const tipGeom = new THREE.CylinderGeometry(1.5, 2, 6, 6);
-                tipGeom.rotateZ(side * Math.PI / 2);
-                const tip = new THREE.Mesh(tipGeom, darkMat);
-                tip.position.set(side * 20, side * -2.5, 3);
-                enemy.add(tip);
-
-                // Wing glow strips
-                const stripGeom = new THREE.BoxGeometry(15, 0.3, 1);
-                const strip = new THREE.Mesh(stripGeom, glowMat);
+                const strip = new THREE.Mesh(new THREE.BoxGeometry(15, 0.3, 1), glowMat);
                 strip.position.set(side * 8, 0.7, 3);
                 enemy.add(strip);
-
-                // Nacelle under wing
-                const nacelleGeom = new THREE.CylinderGeometry(1.2, 1.2, 10, 8);
-                nacelleGeom.rotateX(Math.PI / 2);
-                const nacelle = new THREE.Mesh(nacelleGeom, darkMat);
-                nacelle.position.set(side * 8, -1.5, 5);
-                enemy.add(nacelle);
-
-                // Nacelle glow
-                const nacelleGlowGeom = new THREE.CylinderGeometry(0.8, 0.8, 8, 8);
-                nacelleGlowGeom.rotateX(Math.PI / 2);
-                const nacelleGlow = new THREE.Mesh(nacelleGlowGeom, new THREE.MeshBasicMaterial({
-                    color: 0xff4400, transparent: true, opacity: 0.7
-                }));
-                nacelleGlow.position.set(side * 8, -1.5, 5);
-                enemy.add(nacelleGlow);
             }
 
-            // Torpedo launcher at front
-            const launcherGeom = new THREE.CylinderGeometry(1, 1.5, 4, 8);
-            launcherGeom.rotateX(Math.PI / 2);
-            const launcher = new THREE.Mesh(launcherGeom, darkMat);
-            launcher.position.z = -10;
-            enemy.add(launcher);
-
-            // Front cannon glow
-            const cannonGlowGeom = new THREE.SphereGeometry(0.8, 8, 8);
-            const cannonGlow = new THREE.Mesh(cannonGlowGeom, glowMat);
+            const cannonGlow = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), glowMat);
             cannonGlow.position.z = -12;
             enemy.add(cannonGlow);
 
-            // Engine exhaust
-            const exhaustGeom = new THREE.ConeGeometry(2, 4, 8);
-            exhaustGeom.rotateX(-Math.PI / 2);
-            const exhaustMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.6 });
-            const exhaust = new THREE.Mesh(exhaustGeom, exhaustMat);
-            exhaust.position.z = 10;
-            enemy.add(exhaust);
-        } else {
+        } else if (type === 'romulan') {
+            // Romulan Warbird
             const bodyMat = new THREE.MeshPhongMaterial({ color: 0x336655, specular: 0x224433 });
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
 
-            const upperGeom = new THREE.BoxGeometry(8, 2, 15);
-            const upper = new THREE.Mesh(upperGeom, bodyMat);
-            upper.position.y = 1;
+            const upper = new THREE.Mesh(new THREE.BoxGeometry(8, 2, 18), bodyMat);
             enemy.add(upper);
 
-            const lowerGeom = new THREE.BoxGeometry(6, 2, 12);
-            const lower = new THREE.Mesh(lowerGeom, bodyMat);
-            lower.position.y = -1;
-            enemy.add(lower);
-
             for (let side = -1; side <= 1; side += 2) {
-                const wingGeom = new THREE.BoxGeometry(15, 0.5, 8);
-                const wing = new THREE.Mesh(wingGeom, bodyMat);
-                wing.position.set(side * 8, 0, 0);
-                wing.rotation.z = side * 0.2;
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(18, 0.5, 10), bodyMat);
+                wing.position.set(side * 10, 0, 2);
+                wing.rotation.z = side * 0.15;
                 enemy.add(wing);
             }
 
-            const glowGeom = new THREE.SphereGeometry(1, 8, 8);
-            const glow = new THREE.Mesh(glowGeom, new THREE.MeshBasicMaterial({ color: 0x00ff44 }));
-            glow.position.z = -7;
+            const glow = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), glowMat);
+            glow.position.z = -10;
             enemy.add(glow);
+
+        } else if (type === 'borg') {
+            // Borg Cube - iconic cube shape with green glow
+            const cubeMat = new THREE.MeshPhongMaterial({ color: 0x222222, specular: 0x111111 });
+            const borgGlow = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8 });
+
+            const cube = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), cubeMat);
+            enemy.add(cube);
+
+            // Grid pattern on cube faces
+            for (let i = -1; i <= 1; i += 2) {
+                for (let j = -1; j <= 1; j += 2) {
+                    const lineH = new THREE.Mesh(new THREE.BoxGeometry(18, 0.3, 0.3), borgGlow);
+                    lineH.position.set(0, i * 5, j * 10.1);
+                    enemy.add(lineH);
+
+                    const lineV = new THREE.Mesh(new THREE.BoxGeometry(0.3, 18, 0.3), borgGlow);
+                    lineV.position.set(i * 5, 0, j * 10.1);
+                    enemy.add(lineV);
+                }
+            }
+
+            // Central green glow
+            const core = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), borgGlow);
+            enemy.add(core);
+
+        } else if (type === 'gorn') {
+            // Gorn Raider - aggressive, reptilian design
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0x4a3a2a, specular: 0x332211 });
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+
+            // Sleek predator body
+            const body = new THREE.Mesh(new THREE.ConeGeometry(3, 14, 6), bodyMat);
+            body.rotation.x = Math.PI / 2;
+            enemy.add(body);
+
+            // Aggressive forward spikes
+            for (let i = 0; i < 3; i++) {
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(0.5, 4, 4), bodyMat);
+                spike.rotation.x = Math.PI / 2;
+                spike.position.set((i - 1) * 2, 0, -9);
+                enemy.add(spike);
+            }
+
+            // Engine glow
+            const engine = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), glowMat);
+            engine.position.z = 8;
+            enemy.add(engine);
+
+        } else if (type === 'cardassian') {
+            // Cardassian Galor-class
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0x8a7a5a, specular: 0x554433 });
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+
+            // Main hull - elongated
+            const hull = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 22), bodyMat);
+            enemy.add(hull);
+
+            // Forward section
+            const nose = new THREE.Mesh(new THREE.ConeGeometry(3, 8, 6), bodyMat);
+            nose.rotation.x = Math.PI / 2;
+            nose.position.z = -15;
+            enemy.add(nose);
+
+            // Wing structures
+            for (let side = -1; side <= 1; side += 2) {
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(12, 1, 6), bodyMat);
+                wing.position.set(side * 7, 0, 4);
+                enemy.add(wing);
+            }
+
+            // Weapon glow
+            const weapon = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 8), glowMat);
+            weapon.position.z = -19;
+            enemy.add(weapon);
         }
 
-        // Smaller, more numerous enemy ships
-        const scale = type === 'klingon' ? 0.45 : 0.35;
-        enemy.scale.set(scale, scale, scale);
+        enemy.scale.set(stats.scale, stats.scale, stats.scale);
 
-        // Add shield mesh to enemy
-        const shieldGeom = new THREE.SphereGeometry(15, 16, 16);
+        // Add shield mesh
+        const shieldGeom = new THREE.SphereGeometry(type === 'borg' ? 20 : 15, 16, 16);
         const shieldMat = new THREE.MeshBasicMaterial({
-            color: type === 'klingon' ? 0x44ff44 : 0x44ff88,
+            color: stats.shieldColor,
             transparent: true,
             opacity: 0,
             side: THREE.DoubleSide
@@ -1636,7 +1676,34 @@ class StarTrekGame {
             const leaderZ = this.enterprise.position.z + Math.sin(groupAngle) * leaderDistance;
 
             for (let i = 0; i < groupSize; i++) {
-                const type = Math.random() > 0.7 && this.wave > 2 ? 'romulan' : 'klingon';
+                // Determine enemy type based on wave number
+                let type;
+                const roll = Math.random();
+
+                if (this.wave >= 8) {
+                    // Late waves: all enemy types including Borg
+                    if (roll < 0.1) type = 'borg';          // 10% Borg (rare, powerful)
+                    else if (roll < 0.25) type = 'cardassian'; // 15% Cardassian
+                    else if (roll < 0.45) type = 'romulan';    // 20% Romulan
+                    else if (roll < 0.65) type = 'gorn';       // 20% Gorn
+                    else type = 'klingon';                     // 35% Klingon
+                } else if (this.wave >= 5) {
+                    // Mid waves: Klingon, Romulan, Cardassian, Gorn
+                    if (roll < 0.15) type = 'cardassian';   // 15% Cardassian
+                    else if (roll < 0.35) type = 'romulan'; // 20% Romulan
+                    else if (roll < 0.55) type = 'gorn';    // 20% Gorn
+                    else type = 'klingon';                  // 45% Klingon
+                } else if (this.wave >= 3) {
+                    // Early-mid waves: Klingon, Gorn, Romulan
+                    if (roll < 0.2) type = 'romulan';       // 20% Romulan
+                    else if (roll < 0.45) type = 'gorn';    // 25% Gorn
+                    else type = 'klingon';                  // 55% Klingon
+                } else {
+                    // Starting waves: mostly Klingon and Gorn
+                    if (roll < 0.3) type = 'gorn';          // 30% Gorn (fast, weak scouts)
+                    else type = 'klingon';                  // 70% Klingon
+                }
+
                 const enemy = this.createEnemy(type);
 
                 // V-Formation offsets relative to leader
@@ -1774,16 +1841,55 @@ class StarTrekGame {
             enemy.userData.announced = true;
             this.announcedEnemies.add(enemy);
 
-            const enemyName = enemy.userData.type === 'klingon' ? 'Klingon Bird of Prey' : 'Romulan Warbird';
+            // Get proper ship names for all enemy types
+            const enemyNames = {
+                'klingon': 'Klingon Bird of Prey',
+                'romulan': 'Romulan Warbird',
+                'borg': 'Borg Cube',
+                'gorn': 'Gorn Raider',
+                'cardassian': 'Cardassian Galor-class'
+            };
+            const enemyName = enemyNames[enemy.userData.type] || 'Unknown Vessel';
+
             const bearing = Math.floor(Math.random() * 360);
             const mark = Math.floor(Math.random() * 90);
-            const messages = [
-                `${enemyName} bearing ${bearing} mark ${mark}!`,
-                `${enemyName} on attack vector, ${Math.floor(distance)} meters!`,
-                `Hostile ${enemyName} detected, shields are up!`,
-                `${enemyName} closing to weapons range!`
-            ];
-            this.showCrewDialog('SULU', messages[Math.floor(Math.random() * messages.length)]);
+
+            // Different crew members announce different enemy types
+            let crewMember = 'SULU';
+            let messages;
+
+            if (enemy.userData.type === 'borg') {
+                crewMember = 'SPOCK';
+                messages = [
+                    `${enemyName} detected! Their shields are adaptive, Captain.`,
+                    `${enemyName} bearing ${bearing} mark ${mark}. Recommend maximum firepower.`,
+                    `Borg vessel approaching. They will attempt to adapt to our weapons.`,
+                    `${enemyName} on intercept course. Resistance may prove... difficult.`
+                ];
+            } else if (enemy.userData.type === 'gorn') {
+                messages = [
+                    `${enemyName} bearing ${bearing} mark ${mark}! Fast attack craft!`,
+                    `${enemyName} inbound, ${Math.floor(distance)} meters! They're quick, Captain!`,
+                    `Hostile ${enemyName} detected! Small but maneuverable!`,
+                    `${enemyName} closing fast! They're trying to flank us!`
+                ];
+            } else if (enemy.userData.type === 'cardassian') {
+                messages = [
+                    `${enemyName} bearing ${bearing} mark ${mark}! Heavy warship!`,
+                    `${enemyName} on attack vector! Strong shields detected!`,
+                    `Cardassian warship closing, ${Math.floor(distance)} meters! They're heavily armed!`,
+                    `${enemyName} approaching! Recommend evasive maneuvers!`
+                ];
+            } else {
+                messages = [
+                    `${enemyName} bearing ${bearing} mark ${mark}!`,
+                    `${enemyName} on attack vector, ${Math.floor(distance)} meters!`,
+                    `Hostile ${enemyName} detected, shields are up!`,
+                    `${enemyName} closing to weapons range!`
+                ];
+            }
+
+            this.showCrewDialog(crewMember, messages[Math.floor(Math.random() * messages.length)]);
         }
     }
 
