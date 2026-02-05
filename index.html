@@ -190,15 +190,7 @@
             margin: 25px auto;
         }
 
-        /* Mission select - vertical list */
-        .mission-select {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 35px;
-            z-index: 10;
-            animation: fadeInUp 1s ease-out 0.2s both;
-        }
+        /* Mission select - vertical list (hidden by default, shown when active) */
 
         .mission-card {
             width: 500px;
@@ -326,14 +318,59 @@
             border: 1px solid rgba(150, 100, 255, 0.3);
         }
 
-        /* Settings button */
+        /* Mission select - hidden by default */
+        .mission-select {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 35px;
+            z-index: 10;
+        }
+
+        .mission-select.active {
+            display: flex;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        /* Main menu buttons */
         .title-buttons {
             display: flex;
-            gap: 20px;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
             z-index: 10;
             animation: fadeInUp 1s ease-out 0.4s both;
         }
 
+        .title-buttons.hidden {
+            display: none;
+        }
+
+        /* Primary button (Missions) */
+        .title-btn-primary {
+            padding: 16px 60px;
+            background: linear-gradient(135deg, rgba(244, 168, 50, 0.2) 0%, rgba(244, 168, 50, 0.1) 100%);
+            border: 2px solid rgba(244, 168, 50, 0.6);
+            border-radius: 4px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #f4a832;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .title-btn-primary:hover {
+            background: linear-gradient(135deg, rgba(244, 168, 50, 0.3) 0%, rgba(244, 168, 50, 0.2) 100%);
+            border-color: #f4a832;
+            color: #ffffff;
+            box-shadow: 0 0 30px rgba(244, 168, 50, 0.3);
+            transform: scale(1.02);
+        }
+
+        /* Secondary button (Settings) */
         .title-btn {
             padding: 12px 35px;
             background: transparent;
@@ -354,6 +391,36 @@
             border-color: rgba(136, 204, 255, 0.6);
             color: #ffffff;
             box-shadow: 0 0 20px rgba(136, 204, 255, 0.2);
+        }
+
+        /* Back button when missions are shown */
+        .back-btn {
+            padding: 10px 30px;
+            background: transparent;
+            border: 1px solid rgba(136, 204, 255, 0.3);
+            border-radius: 4px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(136, 204, 255, 0.6);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 10px;
+            z-index: 10;
+            display: none;
+        }
+
+        .back-btn.active {
+            display: block;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .back-btn:hover {
+            background: rgba(136, 204, 255, 0.1);
+            border-color: rgba(136, 204, 255, 0.5);
+            color: #ffffff;
         }
 
         /* Version/credits text */
@@ -1060,7 +1127,12 @@
             <div class="title-ship">Commanding the <span>USS Enterprise NCC-1701</span></div>
         </div>
 
-        <div class="mission-select">
+        <div class="title-buttons" id="mainMenuButtons">
+            <button class="title-btn-primary" onclick="showMissions()">Missions</button>
+            <button class="title-btn" onclick="game.openSettings()">Settings</button>
+        </div>
+
+        <div class="mission-select" id="missionSelect">
             <div class="mission-card" onclick="game.startMission('patrol')">
                 <div class="mission-icon">I</div>
                 <div class="mission-content">
@@ -1110,9 +1182,7 @@
             </div>
         </div>
 
-        <div class="title-buttons">
-            <button class="title-btn" onclick="game.openSettings()">Settings</button>
-        </div>
+        <button class="back-btn" id="backBtn" onclick="hideMissions()">Back</button>
 
         <div class="title-version">STARDATE 2259.42</div>
     </div>
@@ -1339,6 +1409,19 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        function showMissions() {
+            document.getElementById('mainMenuButtons').classList.add('hidden');
+            document.getElementById('missionSelect').classList.add('active');
+            document.getElementById('backBtn').classList.add('active');
+        }
+
+        function hideMissions() {
+            document.getElementById('mainMenuButtons').classList.remove('hidden');
+            document.getElementById('missionSelect').classList.remove('active');
+            document.getElementById('backBtn').classList.remove('active');
+        }
+    </script>
     <script src="game.js"></script>
 </body>
 </html>
