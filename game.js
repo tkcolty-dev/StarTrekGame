@@ -121,6 +121,8 @@ class StarTrekGame {
         this.engineGain = null;
         this.warpOscillator = null;
         this.warpGain = null;
+        this.audioBuffers = {};
+        this.audioLoaded = false;
 
         this.init();
     }
@@ -171,12 +173,59 @@ class StarTrekGame {
             this.masterGain = this.audioCtx.createGain();
             this.masterGain.gain.value = this.masterVolume;
             this.masterGain.connect(this.audioCtx.destination);
+            this.loadAudioSamples();
             this.startEngineSound();
             document.removeEventListener('click', initAudio);
             document.removeEventListener('keydown', initAudio);
         };
         document.addEventListener('click', initAudio);
         document.addEventListener('keydown', initAudio);
+    }
+
+    async loadAudioSamples() {
+        const soundFiles = {
+            phaser: 'sounds/tos_ship_phaser_1.mp3',
+            torpedo: 'sounds/tos_photon_torpedo.mp3',
+            torpedo2: 'sounds/tos_photon_torpedo_2.mp3',
+            redAlert: 'sounds/tos_red_alert.mp3',
+            shieldHit: 'sounds/shield_sizzle.mp3',
+            hullHit1: 'sounds/tos_hullhit_1.mp3',
+            hullHit2: 'sounds/tos_hullhit_2.mp3',
+            hullHit3: 'sounds/tos_hullhit_3.mp3',
+            hullHit4: 'sounds/tos_hullhit_4.mp3',
+            hullDamage: 'sounds/tos_hull_hit.mp3',
+            commChirp: 'sounds/tng_chirp_clean.mp3',
+            commChirp2: 'sounds/tos_chirp_1.mp3',
+        };
+
+        const loadSound = async (name, url) => {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                this.audioBuffers[name] = await this.audioCtx.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                console.warn(`Failed to load sound: ${name} from ${url}`);
+            }
+        };
+
+        await Promise.all(
+            Object.entries(soundFiles).map(([name, url]) => loadSound(name, url))
+        );
+        this.audioLoaded = true;
+        console.log('Star Trek sound effects loaded');
+    }
+
+    playSample(name, volume = 1.0, playbackRate = 1.0) {
+        if (!this.audioCtx || !this.soundEnabled || !this.audioBuffers[name]) return null;
+        const source = this.audioCtx.createBufferSource();
+        source.buffer = this.audioBuffers[name];
+        source.playbackRate.value = playbackRate;
+        const gain = this.audioCtx.createGain();
+        gain.gain.value = volume * this.sfxVolume;
+        source.connect(gain);
+        gain.connect(this.masterGain);
+        source.start(0);
+        return { source, gain };
     }
 
     startEngineSound() {
@@ -389,62 +438,51 @@ class StarTrekGame {
 
     playPhaserSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
-
+        if (this.audioBuffers.phaser) {
+            // Use ship phaser sound with slight pitch variation
+            this.playSample('phaser', 0.6, 0.9 + Math.random() * 0.2);
+            return;
+        }
+        // Fallback: synthesized phaser
         const duration = 0.6;
         const t = this.audioCtx.currentTime;
-
-        // Main beam - characteristic Star Trek phaser
         const osc1 = this.audioCtx.createOscillator();
         const osc2 = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
         const filter = this.audioCtx.createBiquadFilter();
-
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(1200, t);
         osc1.frequency.exponentialRampToValueAtTime(400, t + duration);
-
         osc2.type = 'square';
         osc2.frequency.setValueAtTime(1180, t);
         osc2.frequency.exponentialRampToValueAtTime(380, t + duration);
-
         filter.type = 'bandpass';
         filter.frequency.setValueAtTime(800, t);
         filter.frequency.exponentialRampToValueAtTime(500, t + duration);
         filter.Q.value = 4;
-
         gain.gain.setValueAtTime(0, t);
         gain.gain.linearRampToValueAtTime(0.12 * this.sfxVolume, t + 0.02);
         gain.gain.setValueAtTime(0.12 * this.sfxVolume, t + duration * 0.7);
         gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-
-        const merger = this.audioCtx.createChannelMerger(2);
         osc1.connect(filter);
         osc2.connect(filter);
         filter.connect(gain);
         gain.connect(this.masterGain);
-
         osc1.start(t);
         osc2.start(t);
         osc1.stop(t + duration);
         osc2.stop(t + duration);
-
-        // Add subtle warble
-        const lfo = this.audioCtx.createOscillator();
-        const lfoGain = this.audioCtx.createGain();
-        lfo.frequency.value = 30;
-        lfoGain.gain.value = 20;
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc1.frequency);
-        lfo.start(t);
-        lfo.stop(t + duration);
     }
 
     playTorpedoSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
-
+        if (this.audioBuffers.torpedo) {
+            const key = Math.random() > 0.5 && this.audioBuffers.torpedo2 ? 'torpedo2' : 'torpedo';
+            this.playSample(key, 0.7);
+            return;
+        }
+        // Fallback: synthesized torpedo
         const t = this.audioCtx.currentTime;
-
-        // Tube launch - pneumatic thump
         const launchOsc = this.audioCtx.createOscillator();
         const launchGain = this.audioCtx.createGain();
         const launchFilter = this.audioCtx.createBiquadFilter();
@@ -460,223 +498,91 @@ class StarTrekGame {
         launchGain.connect(this.masterGain);
         launchOsc.start(t);
         launchOsc.stop(t + 0.15);
-
-        // Photon energy charge-up whine
         const chargeOsc = this.audioCtx.createOscillator();
         const chargeGain = this.audioCtx.createGain();
         chargeOsc.type = 'sine';
         chargeOsc.frequency.setValueAtTime(400, t + 0.05);
         chargeOsc.frequency.exponentialRampToValueAtTime(1200, t + 0.3);
-        chargeOsc.frequency.exponentialRampToValueAtTime(800, t + 0.6);
         chargeGain.gain.setValueAtTime(0.1 * this.sfxVolume, t + 0.05);
-        chargeGain.gain.linearRampToValueAtTime(0.15 * this.sfxVolume, t + 0.2);
         chargeGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
         chargeOsc.connect(chargeGain);
         chargeGain.connect(this.masterGain);
         chargeOsc.start(t + 0.05);
         chargeOsc.stop(t + 0.7);
-
-        // Harmonic overtone
-        const harmOsc = this.audioCtx.createOscillator();
-        const harmGain = this.audioCtx.createGain();
-        harmOsc.type = 'triangle';
-        harmOsc.frequency.setValueAtTime(800, t + 0.05);
-        harmOsc.frequency.exponentialRampToValueAtTime(2400, t + 0.3);
-        harmGain.gain.setValueAtTime(0.04 * this.sfxVolume, t + 0.05);
-        harmGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-        harmOsc.connect(harmGain);
-        harmGain.connect(this.masterGain);
-        harmOsc.start(t + 0.05);
-        harmOsc.stop(t + 0.5);
-
-        // Doppler whoosh away
-        const whooshOsc = this.audioCtx.createOscillator();
-        const whooshGain = this.audioCtx.createGain();
-        const whooshFilter = this.audioCtx.createBiquadFilter();
-        whooshOsc.type = 'sawtooth';
-        whooshOsc.frequency.setValueAtTime(600, t + 0.1);
-        whooshOsc.frequency.exponentialRampToValueAtTime(200, t + 0.8);
-        whooshFilter.type = 'bandpass';
-        whooshFilter.frequency.setValueAtTime(800, t + 0.1);
-        whooshFilter.frequency.exponentialRampToValueAtTime(300, t + 0.8);
-        whooshFilter.Q.value = 3;
-        whooshGain.gain.setValueAtTime(0.06 * this.sfxVolume, t + 0.1);
-        whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-        whooshOsc.connect(whooshFilter);
-        whooshFilter.connect(whooshGain);
-        whooshGain.connect(this.masterGain);
-        whooshOsc.start(t + 0.1);
-        whooshOsc.stop(t + 0.9);
     }
 
     playExplosionSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
-
+        if (this.audioBuffers.hullHit1) {
+            // Play a random hull hit for variety, plus layer multiple for bigger explosion
+            const hits = ['hullHit1', 'hullHit2', 'hullHit3', 'hullHit4'].filter(k => this.audioBuffers[k]);
+            const pick = hits[Math.floor(Math.random() * hits.length)];
+            this.playSample(pick, 0.8, 0.8 + Math.random() * 0.4);
+            // Layer a second hit slightly delayed for a bigger boom
+            if (hits.length > 1) {
+                const pick2 = hits[Math.floor(Math.random() * hits.length)];
+                setTimeout(() => this.playSample(pick2, 0.5, 0.6 + Math.random() * 0.3), 80);
+            }
+            return;
+        }
+        // Fallback: synthesized explosion
         const t = this.audioCtx.currentTime;
-        const duration = 2.0;
-
-        // === INITIAL IMPACT - the moment of explosion ===
-        const impactOsc = this.audioCtx.createOscillator();
-        const impactGain = this.audioCtx.createGain();
-        const impactFilter = this.audioCtx.createBiquadFilter();
-        impactOsc.type = 'sawtooth';
-        impactOsc.frequency.setValueAtTime(200, t);
-        impactOsc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
-        impactFilter.type = 'lowpass';
-        impactFilter.frequency.setValueAtTime(800, t);
-        impactFilter.frequency.exponentialRampToValueAtTime(100, t + 0.2);
-        impactGain.gain.setValueAtTime(0.6 * this.sfxVolume, t);
-        impactGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-        impactOsc.connect(impactFilter);
-        impactFilter.connect(impactGain);
-        impactGain.connect(this.masterGain);
-        impactOsc.start(t);
-        impactOsc.stop(t + 0.2);
-
-        // === DEEP BASS BOOM - the shockwave ===
         const boomOsc = this.audioCtx.createOscillator();
         const boomGain = this.audioCtx.createGain();
         boomOsc.type = 'sine';
         boomOsc.frequency.setValueAtTime(80, t);
         boomOsc.frequency.exponentialRampToValueAtTime(15, t + 0.8);
         boomGain.gain.setValueAtTime(0.55 * this.sfxVolume, t);
-        boomGain.gain.setValueAtTime(0.55 * this.sfxVolume, t + 0.05);
         boomGain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
         boomOsc.connect(boomGain);
         boomGain.connect(this.masterGain);
         boomOsc.start(t);
         boomOsc.stop(t + 0.8);
-
-        // === SUB-BASS RUMBLE - felt more than heard ===
-        const subOsc = this.audioCtx.createOscillator();
-        const subGain = this.audioCtx.createGain();
-        subOsc.type = 'sine';
-        subOsc.frequency.setValueAtTime(40, t);
-        subOsc.frequency.exponentialRampToValueAtTime(20, t + 1.2);
-        subGain.gain.setValueAtTime(0.4 * this.sfxVolume, t + 0.05);
-        subGain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-        subOsc.connect(subGain);
-        subGain.connect(this.masterGain);
-        subOsc.start(t);
-        subOsc.stop(t + 1.2);
-
-        // === FIRE/PLASMA ROAR - the burning aftermath ===
         const fireBufferSize = this.audioCtx.sampleRate * 1.5;
         const fireBuffer = this.audioCtx.createBuffer(1, fireBufferSize, this.audioCtx.sampleRate);
         const fireData = fireBuffer.getChannelData(0);
         for (let i = 0; i < fireBufferSize; i++) {
-            const env = Math.exp(-i / (fireBufferSize * 0.3)) * (Math.sin(i / 500) * 0.5 + 0.5);
-            fireData[i] = (Math.random() * 2 - 1) * env;
+            fireData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (fireBufferSize * 0.3));
         }
         const fireNoise = this.audioCtx.createBufferSource();
         fireNoise.buffer = fireBuffer;
-        const fireFilter = this.audioCtx.createBiquadFilter();
         const fireGain = this.audioCtx.createGain();
-        fireFilter.type = 'bandpass';
-        fireFilter.frequency.setValueAtTime(400, t + 0.1);
-        fireFilter.frequency.exponentialRampToValueAtTime(150, t + 1.5);
-        fireFilter.Q.value = 1.5;
-        fireGain.gain.setValueAtTime(0.001, t);
-        fireGain.gain.linearRampToValueAtTime(0.3 * this.sfxVolume, t + 0.15);
+        fireGain.gain.setValueAtTime(0.3 * this.sfxVolume, t);
         fireGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
-        fireNoise.connect(fireFilter);
-        fireFilter.connect(fireGain);
+        fireNoise.connect(fireGain);
         fireGain.connect(this.masterGain);
         fireNoise.start(t);
-
-        // === DEBRIS SCATTER - metal and hull fragments ===
-        const debrisBufferSize = this.audioCtx.sampleRate * duration;
-        const debrisBuffer = this.audioCtx.createBuffer(1, debrisBufferSize, this.audioCtx.sampleRate);
-        const debrisData = debrisBuffer.getChannelData(0);
-        for (let i = 0; i < debrisBufferSize; i++) {
-            const env = Math.exp(-i / (debrisBufferSize * 0.15));
-            // Create metallic pings and clanks randomly
-            if (Math.random() < 0.002) {
-                const pingLength = Math.floor(Math.random() * 800 + 200);
-                for (let j = 0; j < pingLength && i + j < debrisBufferSize; j++) {
-                    debrisData[i + j] += Math.sin(j * (0.1 + Math.random() * 0.2)) *
-                                         Math.exp(-j / 100) * env * 0.5;
-                }
-            }
-            debrisData[i] += (Math.random() * 2 - 1) * env * 0.1;
-        }
-        const debrisNoise = this.audioCtx.createBufferSource();
-        debrisNoise.buffer = debrisBuffer;
-        const debrisFilter = this.audioCtx.createBiquadFilter();
-        const debrisGain = this.audioCtx.createGain();
-        debrisFilter.type = 'highpass';
-        debrisFilter.frequency.setValueAtTime(2000, t);
-        debrisFilter.frequency.exponentialRampToValueAtTime(500, t + duration);
-        debrisGain.gain.setValueAtTime(0.25 * this.sfxVolume, t + 0.05);
-        debrisGain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-        debrisNoise.connect(debrisFilter);
-        debrisFilter.connect(debrisGain);
-        debrisGain.connect(this.masterGain);
-        debrisNoise.start(t);
-
-        // === ELECTRICAL CRACKLE - systems shorting out ===
-        const crackleOsc = this.audioCtx.createOscillator();
-        const crackleGain = this.audioCtx.createGain();
-        const crackleFilter = this.audioCtx.createBiquadFilter();
-        crackleOsc.type = 'square';
-        crackleOsc.frequency.setValueAtTime(120, t + 0.08);
-        crackleOsc.frequency.setValueAtTime(80, t + 0.2);
-        crackleOsc.frequency.setValueAtTime(150, t + 0.3);
-        crackleOsc.frequency.exponentialRampToValueAtTime(40, t + 1.0);
-        crackleFilter.type = 'bandpass';
-        crackleFilter.frequency.value = 1500;
-        crackleFilter.Q.value = 3;
-        crackleGain.gain.setValueAtTime(0.001, t);
-        crackleGain.gain.linearRampToValueAtTime(0.1 * this.sfxVolume, t + 0.1);
-        crackleGain.gain.setValueAtTime(0.05 * this.sfxVolume, t + 0.15);
-        crackleGain.gain.linearRampToValueAtTime(0.08 * this.sfxVolume, t + 0.25);
-        crackleGain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-        crackleOsc.connect(crackleFilter);
-        crackleFilter.connect(crackleGain);
-        crackleGain.connect(this.masterGain);
-        crackleOsc.start(t + 0.08);
-        crackleOsc.stop(t + 1.0);
     }
 
     playShieldHitSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
+        if (this.audioBuffers.shieldHit) {
+            this.playSample('shieldHit', 0.7, 0.9 + Math.random() * 0.2);
+            return;
+        }
+        // Fallback: synthesized shield hit
         const t = this.audioCtx.currentTime;
-
-        // Electric crackle
         const osc = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
-        const filter = this.audioCtx.createBiquadFilter();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(3000, t);
         osc.frequency.exponentialRampToValueAtTime(800, t + 0.15);
-        filter.type = 'highpass';
-        filter.frequency.value = 500;
         gain.gain.setValueAtTime(0.12 * this.sfxVolume, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-        osc.connect(filter);
-        filter.connect(gain);
+        osc.connect(gain);
         gain.connect(this.masterGain);
         osc.start(t);
         osc.stop(t + 0.2);
-
-        // Resonant ping
-        const pingOsc = this.audioCtx.createOscillator();
-        const pingGain = this.audioCtx.createGain();
-        pingOsc.type = 'sine';
-        pingOsc.frequency.value = 1800;
-        pingGain.gain.setValueAtTime(0.08 * this.sfxVolume, t);
-        pingGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-        pingOsc.connect(pingGain);
-        pingGain.connect(this.masterGain);
-        pingOsc.start(t);
-        pingOsc.stop(t + 0.3);
     }
 
     playHullDamageSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
+        if (this.audioBuffers.hullDamage) {
+            this.playSample('hullDamage', 0.7, 0.9 + Math.random() * 0.2);
+            return;
+        }
+        // Fallback: synthesized hull damage
         const t = this.audioCtx.currentTime;
-
-        // Metal impact
         const bufferSize = this.audioCtx.sampleRate * 0.15;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -686,17 +592,10 @@ class StarTrekGame {
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
         const noiseGain = this.audioCtx.createGain();
-        const noiseFilter = this.audioCtx.createBiquadFilter();
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 800;
-        noiseFilter.Q.value = 1;
         noiseGain.gain.value = 0.25 * this.sfxVolume;
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
+        noise.connect(noiseGain);
         noiseGain.connect(this.masterGain);
         noise.start(t);
-
-        // Structural groan
         const groanOsc = this.audioCtx.createOscillator();
         const groanGain = this.audioCtx.createGain();
         groanOsc.type = 'triangle';
@@ -712,27 +611,53 @@ class StarTrekGame {
 
     playEnemyFireSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
+        // Synthesized disruptor - harsh electronic sound distinct from Federation phasers
         const t = this.audioCtx.currentTime;
-
-        // Disruptor - harsh electronic
         const osc = this.audioCtx.createOscillator();
+        const osc2 = this.audioCtx.createOscillator();
         const gain = this.audioCtx.createGain();
+        const filter = this.audioCtx.createBiquadFilter();
         osc.type = 'square';
-        osc.frequency.setValueAtTime(400, t);
-        osc.frequency.exponentialRampToValueAtTime(200, t + 0.2);
-        gain.gain.setValueAtTime(0.05 * this.sfxVolume, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-        osc.connect(gain);
+        osc.frequency.setValueAtTime(500, t);
+        osc.frequency.exponentialRampToValueAtTime(150, t + 0.25);
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(450, t);
+        osc2.frequency.exponentialRampToValueAtTime(120, t + 0.25);
+        filter.type = 'bandpass';
+        filter.frequency.value = 600;
+        filter.Q.value = 2;
+        gain.gain.setValueAtTime(0.07 * this.sfxVolume, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        osc.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
         gain.connect(this.masterGain);
         osc.start(t);
-        osc.stop(t + 0.25);
+        osc2.start(t);
+        osc.stop(t + 0.3);
+        osc2.stop(t + 0.3);
     }
 
     playAlertSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
+        if (this.audioBuffers.redAlert) {
+            // Play a short clip of the red alert (it's a long looping sound)
+            const source = this.audioCtx.createBufferSource();
+            source.buffer = this.audioBuffers.redAlert;
+            const gain = this.audioCtx.createGain();
+            gain.gain.value = 0.4 * this.sfxVolume;
+            // Fade out after 2 seconds
+            gain.gain.setValueAtTime(0.4 * this.sfxVolume, this.audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.4 * this.sfxVolume, this.audioCtx.currentTime + 1.5);
+            gain.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 2.0);
+            source.connect(gain);
+            gain.connect(this.masterGain);
+            source.start(0);
+            source.stop(this.audioCtx.currentTime + 2.0);
+            return;
+        }
+        // Fallback: synthesized red alert
         const t = this.audioCtx.currentTime;
-
-        // Classic Star Trek red alert
         for (let i = 0; i < 3; i++) {
             const osc = this.audioCtx.createOscillator();
             const gain = this.audioCtx.createGain();
@@ -807,9 +732,14 @@ class StarTrekGame {
 
     playCrewVoiceSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
+        if (this.audioBuffers.commChirp) {
+            // Prefer TOS communicator chirp (matches TOS era), TNG chirp as alternate
+            const key = Math.random() > 0.7 && this.audioBuffers.commChirp ? 'commChirp' : 'commChirp2';
+            this.playSample(this.audioBuffers[key] ? key : 'commChirp', 0.5);
+            return;
+        }
+        // Fallback: synthesized comm chirp
         const t = this.audioCtx.currentTime;
-
-        // Comm chirp before voice
         const chirp = this.audioCtx.createOscillator();
         const chirpGain = this.audioCtx.createGain();
         chirp.type = 'sine';
