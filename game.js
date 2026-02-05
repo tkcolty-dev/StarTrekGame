@@ -1491,19 +1491,43 @@ class StarTrekGame {
         // Reset announced enemies for new wave
         this.announcedEnemies.clear();
 
-        for (let i = 0; i < enemyCount; i++) {
-            const type = Math.random() > 0.7 && this.wave > 2 ? 'romulan' : 'klingon';
-            const enemy = this.createEnemy(type);
+        // Spawn enemies in groups from 1-3 directions
+        const numGroups = Math.min(1 + Math.floor(this.wave / 2), 3); // 1-3 groups based on wave
+        const enemiesPerGroup = Math.ceil(enemyCount / numGroups);
 
-            // Start enemies MUCH further out (400-600 units away)
-            const angle = (i / enemyCount) * Math.PI * 2;
-            const distance = 400 + Math.random() * 200;
-            enemy.position.x = this.enterprise.position.x + Math.cos(angle) * distance;
-            enemy.position.y = (Math.random() - 0.5) * 30;
-            enemy.position.z = this.enterprise.position.z + Math.sin(angle) * distance;
+        // Pick random directions for groups to approach from
+        const groupAngles = [];
+        for (let g = 0; g < numGroups; g++) {
+            // Spread groups out but not evenly around - pick random sectors
+            const baseAngle = (Math.random() * Math.PI * 2);
+            groupAngles.push(baseAngle + g * (Math.PI * 0.6)); // Groups separated by ~108 degrees
+        }
 
-            this.enemies.push(enemy);
-            this.scene.add(enemy);
+        let enemiesSpawned = 0;
+        for (let g = 0; g < numGroups; g++) {
+            const groupAngle = groupAngles[g];
+            const groupSize = Math.min(enemiesPerGroup, enemyCount - enemiesSpawned);
+
+            for (let i = 0; i < groupSize; i++) {
+                const type = Math.random() > 0.7 && this.wave > 2 ? 'romulan' : 'klingon';
+                const enemy = this.createEnemy(type);
+
+                // Spawn in formation within the group
+                const distance = 500 + Math.random() * 150;
+                const angleSpread = (i - groupSize / 2) * 0.15; // Spread within group
+                const finalAngle = groupAngle + angleSpread;
+
+                // Formation offset (line or V formation)
+                const formationDepth = (i % 3) * 30; // Stagger depth
+
+                enemy.position.x = this.enterprise.position.x + Math.cos(finalAngle) * (distance + formationDepth);
+                enemy.position.y = (Math.random() - 0.5) * 20;
+                enemy.position.z = this.enterprise.position.z + Math.sin(finalAngle) * (distance + formationDepth);
+
+                this.enemies.push(enemy);
+                this.scene.add(enemy);
+                enemiesSpawned++;
+            }
         }
 
         document.getElementById('waveNumber').textContent = this.wave;
