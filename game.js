@@ -1345,7 +1345,7 @@ class StarTrekGame {
             maxShields: type === 'klingon' ? 120 : 100,
             speed: type === 'klingon' ? 0.4 : 0.5,
             turnSpeed: type === 'klingon' ? 0.015 : 0.02,
-            damage: type === 'klingon' ? 15 : 12,
+            damage: type === 'klingon' ? 30 : 20,
             fireRate: type === 'klingon' ? 2500 : 3500,
             lastFire: 0,
             credits: type === 'klingon' ? 100 : 175,
