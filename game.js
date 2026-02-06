@@ -152,17 +152,20 @@ class StarTrekGame {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         // Bloom post-processing
-        this.composer = new THREE.EffectComposer(this.renderer);
-        const renderPass = new THREE.RenderPass(this.scene, this.camera);
-        this.composer.addPass(renderPass);
+        this.bloomEnabled = !!(THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass);
+        if (this.bloomEnabled) {
+            this.composer = new THREE.EffectComposer(this.renderer);
+            const renderPass = new THREE.RenderPass(this.scene, this.camera);
+            this.composer.addPass(renderPass);
 
-        this.bloomPass = new THREE.UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.8,   // strength
-            0.4,   // radius
-            0.85   // threshold
-        );
-        this.composer.addPass(this.bloomPass);
+            this.bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                0.8,   // strength
+                0.4,   // radius
+                0.85   // threshold
+            );
+            this.composer.addPass(this.bloomPass);
+        }
 
         // Screen shake state
         this.screenShake = { intensity: 0, duration: 0, elapsed: 0, active: false };
@@ -2701,7 +2704,7 @@ class StarTrekGame {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.composer.setSize(window.innerWidth, window.innerHeight);
+            if (this.bloomEnabled) this.composer.setSize(window.innerWidth, window.innerHeight);
         });
     }
 
@@ -4060,7 +4063,11 @@ class StarTrekGame {
         this.updateEngineTrails(deltaTime);
         this.updateWarpLines(deltaTime);
 
-        this.composer.render();
+        if (this.bloomEnabled) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 }
 
