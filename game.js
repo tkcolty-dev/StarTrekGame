@@ -17,7 +17,7 @@ class StarTrekGame {
             shields: 100, maxShields: 100,
             energy: 100, maxEnergy: 100,
             phaserCharge: 100,
-            torpedoes: 10, maxTorpedoes: 10,
+            torpedoes: 72, maxTorpedoes: 72,
             phaserDamage: 50, torpedoDamage: 200,
             shieldsActive: true,
             speed: 0, maxSpeed: 2,
