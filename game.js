@@ -3382,42 +3382,29 @@ class StarTrekGame {
 
         // Mouse yaw - War Thunder style: ship turns left/right toward mouse
         const mouseX = this.mouse.x; // -1 (left) to 1 (right)
-        const yawRate = -mouseX * 0.03;
+        const yawRate = -mouseX * 0.045;
 
         // Apply yaw around world Y axis (keeps ship level)
         const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate);
         this.enterprise.quaternion.premultiply(yawQuat);
 
-        // Pitch - W / Down Arrow = nose down, S / Up Arrow = nose up
-        const pitchDown = this.keys['w'] || this.keys['arrowdown'];
-        const pitchUp = this.keys['s'] || this.keys['arrowup'];
-        if (pitchUp || pitchDown) {
-            const pitchAmount = (pitchUp ? 1 : -1) * turnSpeed * 0.8;
-            // Apply pitch around ship's local X axis
-            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.enterprise.quaternion);
-            const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, pitchAmount);
-            this.enterprise.quaternion.premultiply(pitchQuat);
-        }
+        // Mouse pitch - War Thunder style: ship pitches toward mouse vertical
+        const mouseY = this.mouse.y; // -1 (bottom) to 1 (top)
+        const pitchRate = mouseY * 0.045;
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.enterprise.quaternion);
+        const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, pitchRate);
+        this.enterprise.quaternion.premultiply(pitchQuat);
 
         // Force ship to stay level: extract yaw and pitch, zero out roll
         const euler = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
         euler.z = 0; // kill all roll
         this.enterprise.quaternion.setFromEuler(euler);
 
-        // Auto-level pitch when not pressing keys
-        if (!pitchUp && !pitchDown) {
-            const euler2 = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
-            euler2.x *= 0.94;
-            this.enterprise.quaternion.setFromEuler(euler2);
-        }
-
-        // Throttle - E / Right Arrow = speed up, Q / Left Arrow = slow down
-        if (this.keys['e'] || this.keys['arrowright']) {
+        // Throttle - E / W / Up Arrow = speed up, Q / S / Down Arrow = slow down
+        if (this.keys['e'] || this.keys['w'] || this.keys['arrowup']) {
             this.stats.speed = Math.min(this.stats.speed + 0.05, this.stats.maxSpeed);
-        } else if (this.keys['q'] || this.keys['arrowleft']) {
+        } else if (this.keys['q'] || this.keys['s'] || this.keys['arrowdown']) {
             this.stats.speed = Math.max(this.stats.speed - 0.05, 0);
-        } else {
-            this.stats.speed *= 0.998;
         }
 
         // Warp
