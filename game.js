@@ -3388,9 +3388,9 @@ class StarTrekGame {
         const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate);
         this.enterprise.quaternion.premultiply(yawQuat);
 
-        // Pitch - W / Up Arrow / Q = nose down, S / Down Arrow / E = nose up
-        const pitchDown = this.keys['w'] || this.keys['arrowup'] || this.keys['q'];
-        const pitchUp = this.keys['s'] || this.keys['arrowdown'] || this.keys['e'];
+        // Pitch - W / Down Arrow = nose down, S / Up Arrow = nose up
+        const pitchDown = this.keys['w'] || this.keys['arrowdown'];
+        const pitchUp = this.keys['s'] || this.keys['arrowup'];
         if (pitchUp || pitchDown) {
             const pitchAmount = (pitchUp ? 1 : -1) * turnSpeed * 0.8;
             // Apply pitch around ship's local X axis
@@ -3411,10 +3411,10 @@ class StarTrekGame {
             this.enterprise.quaternion.setFromEuler(euler2);
         }
 
-        // Throttle - Right Arrow = speed up, Left Arrow = slow down
-        if (this.keys['arrowright']) {
+        // Throttle - E / Right Arrow = speed up, Q / Left Arrow = slow down
+        if (this.keys['e'] || this.keys['arrowright']) {
             this.stats.speed = Math.min(this.stats.speed + 0.05, this.stats.maxSpeed);
-        } else if (this.keys['arrowleft']) {
+        } else if (this.keys['q'] || this.keys['arrowleft']) {
             this.stats.speed = Math.max(this.stats.speed - 0.05, 0);
         } else {
             this.stats.speed *= 0.998;
