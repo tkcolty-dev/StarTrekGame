@@ -238,6 +238,16 @@ class StarTrekGame {
             hullDamage: 'sounds/tos_hull_hit.mp3',
             commChirp: 'sounds/tng_chirp_clean.mp3',
             commChirp2: 'sounds/tos_chirp_1.mp3',
+            largeExplosion1: 'sounds/largeexplosion1.mp3',
+            largeExplosion2: 'sounds/largeexplosion2.mp3',
+            largeExplosion3: 'sounds/largeexplosion3.mp3',
+            largeExplosion4: 'sounds/largeexplosion4.mp3',
+            smallExplosion1: 'sounds/smallexplosion1.mp3',
+            smallExplosion2: 'sounds/smallexplosion2.mp3',
+            smallExplosion3: 'sounds/smallexplosion3.mp3',
+            consoleExplosion: 'sounds/console_explo_01.mp3',
+            phaserStrike: 'sounds/tng_phaser_strike.mp3',
+            disruptor: 'sounds/tos_disruptor.mp3',
         };
 
         const loadSound = async (name, url) => {
@@ -555,15 +565,16 @@ class StarTrekGame {
 
     playExplosionSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
-        if (this.audioBuffers.hullHit1) {
-            // Play a random hull hit for variety, plus layer multiple for bigger explosion
-            const hits = ['hullHit1', 'hullHit2', 'hullHit3', 'hullHit4'].filter(k => this.audioBuffers[k]);
-            const pick = hits[Math.floor(Math.random() * hits.length)];
-            this.playSample(pick, 0.8, 0.8 + Math.random() * 0.4);
-            // Layer a second hit slightly delayed for a bigger boom
-            if (hits.length > 1) {
-                const pick2 = hits[Math.floor(Math.random() * hits.length)];
-                setTimeout(() => this.playSample(pick2, 0.5, 0.6 + Math.random() * 0.3), 80);
+        // Use TrekCore large explosion sounds
+        const largeExplosions = ['largeExplosion1', 'largeExplosion2', 'largeExplosion3', 'largeExplosion4'].filter(k => this.audioBuffers[k]);
+        if (largeExplosions.length > 0) {
+            const pick = largeExplosions[Math.floor(Math.random() * largeExplosions.length)];
+            this.playSample(pick, 0.9, 0.85 + Math.random() * 0.3);
+            // Layer a small explosion for extra punch
+            const smallExplosions = ['smallExplosion1', 'smallExplosion2', 'smallExplosion3'].filter(k => this.audioBuffers[k]);
+            if (smallExplosions.length > 0) {
+                const pick2 = smallExplosions[Math.floor(Math.random() * smallExplosions.length)];
+                setTimeout(() => this.playSample(pick2, 0.5, 0.7 + Math.random() * 0.3), 60);
             }
             return;
         }
@@ -600,6 +611,10 @@ class StarTrekGame {
         if (!this.audioCtx || !this.soundEnabled) return;
         if (this.audioBuffers.shieldHit) {
             this.playSample('shieldHit', 0.7, 0.9 + Math.random() * 0.2);
+            // Layer phaser strike for impact feel
+            if (this.audioBuffers.phaserStrike) {
+                this.playSample('phaserStrike', 0.4, 0.9 + Math.random() * 0.2);
+            }
             return;
         }
         // Fallback: synthesized shield hit
@@ -621,6 +636,10 @@ class StarTrekGame {
         if (!this.audioCtx || !this.soundEnabled) return;
         if (this.audioBuffers.hullDamage) {
             this.playSample('hullDamage', 0.7, 0.9 + Math.random() * 0.2);
+            // Layer console explosion for internal damage feel
+            if (this.audioBuffers.consoleExplosion) {
+                setTimeout(() => this.playSample('consoleExplosion', 0.5, 0.9 + Math.random() * 0.2), 50);
+            }
             return;
         }
         // Fallback: synthesized hull damage
@@ -653,7 +672,11 @@ class StarTrekGame {
 
     playEnemyFireSound() {
         if (!this.audioCtx || !this.soundEnabled) return;
-        // Synthesized disruptor - harsh electronic sound distinct from Federation phasers
+        if (this.audioBuffers.disruptor) {
+            this.playSample('disruptor', 0.4, 0.9 + Math.random() * 0.2);
+            return;
+        }
+        // Fallback: synthesized disruptor - harsh electronic sound distinct from Federation phasers
         const t = this.audioCtx.currentTime;
         const osc = this.audioCtx.createOscillator();
         const osc2 = this.audioCtx.createOscillator();
@@ -3546,12 +3569,14 @@ class StarTrekGame {
             proj.userData.life -= deltaTime;
 
             if (proj.userData.type === 'torpedo') {
-                // Homing towards target
+                // Strong homing towards locked target
                 if (proj.userData.target && this.enemies.includes(proj.userData.target)) {
                     const toTarget = proj.userData.target.position.clone().sub(proj.position).normalize();
-                    proj.userData.velocity.lerp(toTarget.multiplyScalar(5), 0.02);
+                    proj.userData.velocity.lerp(toTarget.multiplyScalar(5), 0.12);
                 }
                 proj.position.add(proj.userData.velocity);
+                // Orient torpedo to face direction of travel
+                proj.lookAt(proj.position.clone().add(proj.userData.velocity));
 
                 this.enemies.forEach(enemy => {
                     if (proj.position.distanceTo(enemy.position) < 10) {
