@@ -98,6 +98,9 @@ class StarTrekGame {
         this.phaserCooldown = 0;
         this.torpedoCooldown = 0;
 
+        // Raycaster for mouse aiming
+        this.raycaster = new THREE.Raycaster();
+
         this.uiVisible = true;
 
         // Target lock system
@@ -2672,11 +2675,10 @@ class StarTrekGame {
             }
         });
 
-        // Left click - fire phasers
+        // Left click - hold to continuously fire phasers
         window.addEventListener('mousedown', (e) => {
             if (e.button === 0) {
                 this.mouse.down = true;
-                this.firePhaser();
             }
             if (e.button === 2) {
                 this.mouse.rightDown = true;
@@ -2822,6 +2824,15 @@ class StarTrekGame {
     // COMBAT
     // ============================================
 
+    getMouseAimPoint() {
+        // Raycast from camera through mouse position to get a 3D aim point
+        this.raycaster.setFromCamera(new THREE.Vector2(this.mouse.x, this.mouse.y), this.camera);
+        const aimPoint = this.raycaster.ray.origin.clone().add(
+            this.raycaster.ray.direction.clone().multiplyScalar(500)
+        );
+        return aimPoint;
+    }
+
     firePhaser() {
         if (!this.gameStarted || this.phaserCooldown > 0 || this.stats.phaserCharge < 10) return;
 
@@ -2830,17 +2841,9 @@ class StarTrekGame {
         this.playPhaserSound();
 
         const start = this.enterprise.position.clone();
-        let end;
-
-        // If we have a target lock, fire at target - extended range
-        if (this.targetLocked) {
-            const direction = this.targetLocked.position.clone().sub(start).normalize();
-            end = start.clone().add(direction.multiplyScalar(500));
-        } else {
-            const direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(this.enterprise.quaternion);
-            end = start.clone().add(direction.multiplyScalar(500));
-        }
+        const aimPoint = this.getMouseAimPoint();
+        const direction = aimPoint.clone().sub(start).normalize();
+        const end = start.clone().add(direction.multiplyScalar(500));
 
         const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
         const material = new THREE.LineBasicMaterial({
@@ -2927,13 +2930,8 @@ class StarTrekGame {
         trail.position.z = 1.5;
         torpedo.add(trail);
 
-        let direction;
-        if (this.targetLocked) {
-            direction = this.targetLocked.position.clone().sub(this.enterprise.position).normalize();
-        } else {
-            direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(this.enterprise.quaternion);
-        }
+        const aimPoint = this.getMouseAimPoint();
+        const direction = aimPoint.clone().sub(this.enterprise.position).normalize();
 
         torpedo.userData = {
             velocity: direction.multiplyScalar(5),
@@ -3357,67 +3355,68 @@ class StarTrekGame {
         if (this.phaserCooldown > 0) this.phaserCooldown -= deltaTime;
         if (this.torpedoCooldown > 0) this.torpedoCooldown -= deltaTime;
 
-        // WASD + Arrow key controls (mouse flight disabled)
+        // Continuous phaser fire while holding left mouse button
+        if (this.mouse.down && this.gameStarted) {
+            this.firePhaser();
+        }
+
+        // Arrow key + WASD flight controls
 
         // Autopilot - automatically fly towards nearest enemy
         if (this.autopilotEnabled && this.targetLocked && this.gameStarted) {
             const toTarget = this.targetLocked.position.clone().sub(this.enterprise.position).normalize();
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.enterprise.quaternion);
 
-            // Calculate turn needed
             const cross = new THREE.Vector3().crossVectors(forward, toTarget);
-            this.enterprise.rotation.y += cross.y * 0.025;
-            this.enterprise.rotation.x -= cross.x * 0.015;
-            this.enterprise.rotation.x = Math.max(-0.4, Math.min(0.4, this.enterprise.rotation.x));
-            this.enterprise.rotation.z *= 0.95;
+            const apEuler = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
+            apEuler.y += cross.y * 0.025;
+            apEuler.x -= cross.x * 0.015;
+            apEuler.x = Math.max(-0.4, Math.min(0.4, apEuler.x));
+            apEuler.z = 0;
+            this.enterprise.quaternion.setFromEuler(apEuler);
 
-            // Auto-accelerate
             this.stats.speed = Math.min(this.stats.speed + 0.01, this.stats.maxSpeed * 0.7);
         }
 
         const turnSpeed = this.stats.turnSpeed * deltaTime * 0.12;
 
-        // Keyboard flight controls
-        // A/D and Left/Right arrows = yaw (turn left/right)
-        if (this.keys['a'] || this.keys['arrowleft']) this.enterprise.rotation.y += turnSpeed;
-        if (this.keys['d'] || this.keys['arrowright']) this.enterprise.rotation.y -= turnSpeed;
+        // Mouse yaw - War Thunder style: ship turns left/right toward mouse
+        const mouseX = this.mouse.x; // -1 (left) to 1 (right)
+        const yawRate = -mouseX * 0.03;
 
-        // Up/Down arrows = pitch (nose up/down)
-        if (this.keys['arrowup']) {
-            this.enterprise.rotation.x += turnSpeed * 0.8;
-            this.enterprise.rotation.x = Math.min(0.8, this.enterprise.rotation.x);
-        }
-        if (this.keys['arrowdown']) {
-            this.enterprise.rotation.x -= turnSpeed * 0.8;
-            this.enterprise.rotation.x = Math.max(-0.8, this.enterprise.rotation.x);
-        }
+        // Apply yaw around world Y axis (keeps ship level)
+        const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate);
+        this.enterprise.quaternion.premultiply(yawQuat);
 
-        // Q/E = roll
-        if (this.keys['q']) this.enterprise.rotation.z += turnSpeed * 0.6;
-        if (this.keys['e']) this.enterprise.rotation.z -= turnSpeed * 0.6;
-
-        // Add slight roll when turning for feel
-        if (this.keys['a'] || this.keys['arrowleft']) {
-            this.enterprise.rotation.z = Math.min(this.enterprise.rotation.z + 0.003, 0.25);
-        } else if (this.keys['d'] || this.keys['arrowright']) {
-            this.enterprise.rotation.z = Math.max(this.enterprise.rotation.z - 0.003, -0.25);
+        // Pitch - W / Up Arrow / Q = nose down, S / Down Arrow / E = nose up
+        const pitchDown = this.keys['w'] || this.keys['arrowup'] || this.keys['q'];
+        const pitchUp = this.keys['s'] || this.keys['arrowdown'] || this.keys['e'];
+        if (pitchUp || pitchDown) {
+            const pitchAmount = (pitchUp ? 1 : -1) * turnSpeed * 0.8;
+            // Apply pitch around ship's local X axis
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.enterprise.quaternion);
+            const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, pitchAmount);
+            this.enterprise.quaternion.premultiply(pitchQuat);
         }
 
-        // Auto-level pitch and roll when not pressing keys
-        if (!this.keys['arrowup'] && !this.keys['arrowdown']) {
-            this.enterprise.rotation.x *= 0.94;
-        }
-        if (!this.keys['q'] && !this.keys['e'] && !this.keys['a'] && !this.keys['d'] && !this.keys['arrowleft'] && !this.keys['arrowright']) {
-            this.enterprise.rotation.z *= 0.93;
+        // Force ship to stay level: extract yaw and pitch, zero out roll
+        const euler = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
+        euler.z = 0; // kill all roll
+        this.enterprise.quaternion.setFromEuler(euler);
+
+        // Auto-level pitch when not pressing keys
+        if (!pitchUp && !pitchDown) {
+            const euler2 = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
+            euler2.x *= 0.94;
+            this.enterprise.quaternion.setFromEuler(euler2);
         }
 
-        // Throttle - W/S to accelerate/decelerate
-        if (this.keys['w']) {
+        // Throttle - Right Arrow = speed up, Left Arrow = slow down
+        if (this.keys['arrowright']) {
             this.stats.speed = Math.min(this.stats.speed + 0.05, this.stats.maxSpeed);
-        } else if (this.keys['s']) {
+        } else if (this.keys['arrowleft']) {
             this.stats.speed = Math.max(this.stats.speed - 0.05, 0);
         } else {
-            // Gentle speed decay when not pressing throttle
             this.stats.speed *= 0.998;
         }
 
@@ -3641,19 +3640,19 @@ class StarTrekGame {
         if (!this.killCamActive) {
             const shipPos = this.enterprise.position.clone();
 
+            // Extract yaw and pitch from ship quaternion
+            const shipEuler = new THREE.Euler().setFromQuaternion(this.enterprise.quaternion, 'YXZ');
+
             // Camera follow - smoothly follow ship's heading from behind
             if (this.cameraFollowShip) {
-                // Camera should be behind the ship
-                const targetYaw = this.enterprise.rotation.y;
+                const targetYaw = shipEuler.y;
                 let diff = targetYaw - this.cameraTargetRotation.y;
-                // Normalize angle difference to [-PI, PI]
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 this.cameraTargetRotation.y += diff * 0.04;
                 this.cameraRotation.y += (this.cameraTargetRotation.y - this.cameraRotation.y) * 0.1;
 
-                // Also follow pitch slightly
-                const targetPitch = 0.3 - this.enterprise.rotation.x * 0.3;
+                const targetPitch = 0.3 - shipEuler.x * 0.3;
                 this.cameraRotation.x += (targetPitch - this.cameraRotation.x) * 0.05;
             }
 
