@@ -1382,10 +1382,12 @@
 
         <div id="controlsHelp" class="ui-container">
             <div class="panel-title" style="color: #ff9500; margin-bottom: 6px;">CONTROLS</div>
-            <div class="control-item"><span class="control-key">MOUSE</span><span class="control-action">Steer Ship</span></div>
+            <div class="control-item"><span class="control-key">W / S</span><span class="control-action">Throttle</span></div>
+            <div class="control-item"><span class="control-key">A / D</span><span class="control-action">Turn L/R</span></div>
+            <div class="control-item"><span class="control-key">&#x2191; / &#x2193;</span><span class="control-action">Pitch U/D</span></div>
+            <div class="control-item"><span class="control-key">Q / E</span><span class="control-action">Roll</span></div>
             <div class="control-item"><span class="control-key">L-CLICK</span><span class="control-action">Phasers</span></div>
             <div class="control-item"><span class="control-key">R-CLICK</span><span class="control-action">Torpedoes</span></div>
-            <div class="control-item"><span class="control-key">W / S</span><span class="control-action">Throttle</span></div>
             <div class="control-item"><span class="control-key">SHIFT</span><span class="control-action">Warp</span></div>
             <div class="control-item"><span class="control-key">R</span><span class="control-action">Repair (hold)</span></div>
             <div class="control-item"><span class="control-key">P</span><span class="control-action">Autopilot</span></div>
@@ -1427,6 +1429,12 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
     <script>
         function showMissions() {
             document.getElementById('mainMenuButtons').classList.add('hidden');

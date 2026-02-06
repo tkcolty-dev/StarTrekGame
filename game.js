@@ -144,12 +144,45 @@ class StarTrekGame {
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
+
+        // Shadow setup
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Bloom post-processing
+        this.composer = new THREE.EffectComposer(this.renderer);
+        const renderPass = new THREE.RenderPass(this.scene, this.camera);
+        this.composer.addPass(renderPass);
+
+        this.bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.8,   // strength
+            0.4,   // radius
+            0.85   // threshold
+        );
+        this.composer.addPass(this.bloomPass);
+
+        // Screen shake state
+        this.screenShake = { intensity: 0, duration: 0, elapsed: 0, active: false };
+
+        // Engine trail particles
+        this.engineTrails = [];
+
+        // Warp speed lines
+        this.warpLines = null;
+        this.warpLinesOpacity = 0;
+
+        // Explosion flash lights
+        this.explosionFlashes = [];
 
         this.setupAudio();
         this.setupLighting();
         this.createStarfield();
         this.createNebula();
         this.createEnterprise();
+        this.createWarpLines();
         this.createTargetLockIndicator();
         this.setupControls();
         this.setupMinimap();
@@ -822,9 +855,19 @@ class StarTrekGame {
         const ambient = new THREE.AmbientLight(0x334455, 0.6);
         this.scene.add(ambient);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        sunLight.position.set(100, 80, 100);
-        this.scene.add(sunLight);
+        this.sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        this.sunLight.position.set(100, 80, 100);
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.width = 1024;
+        this.sunLight.shadow.mapSize.height = 1024;
+        this.sunLight.shadow.camera.near = 1;
+        this.sunLight.shadow.camera.far = 500;
+        this.sunLight.shadow.camera.left = -100;
+        this.sunLight.shadow.camera.right = 100;
+        this.sunLight.shadow.camera.top = 100;
+        this.sunLight.shadow.camera.bottom = -100;
+        this.scene.add(this.sunLight);
+        this.scene.add(this.sunLight.target);
 
         const fillLight = new THREE.DirectionalLight(0x6688aa, 0.4);
         fillLight.position.set(-80, -40, -60);
@@ -1465,6 +1508,9 @@ class StarTrekGame {
         this.enterprise.rotation.y = Math.PI;
         this.scene.add(this.enterprise);
 
+        // Enable shadows on Enterprise meshes
+        this.enableShadows(this.enterprise);
+
         // Shield mesh - larger to encompass full ship
         const shieldGeom = new THREE.SphereGeometry(30, 32, 32);
         this.shieldMesh = new THREE.Mesh(shieldGeom, new THREE.MeshBasicMaterial({
@@ -1938,6 +1984,7 @@ class StarTrekGame {
                 enemy.userData.formationOffset = new THREE.Vector3(offsetX, 0, offsetZ);
                 enemy.userData.isLeader = (i === 0);
 
+                this.enableShadows(enemy);
                 this.enemies.push(enemy);
                 this.scene.add(enemy);
                 enemiesSpawned++;
@@ -2065,6 +2112,7 @@ class StarTrekGame {
             ally.position.copy(this.enterprise.position).add(formationOffsets[i]);
             ally.quaternion.copy(this.enterprise.quaternion);
 
+            this.enableShadows(ally);
             this.allies.push(ally);
             this.scene.add(ally);
         }
@@ -2653,6 +2701,7 @@ class StarTrekGame {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.composer.setSize(window.innerWidth, window.innerHeight);
         });
     }
 
@@ -2974,6 +3023,9 @@ class StarTrekGame {
     }
 
     createExplosion(position) {
+        // Explosion flash light + bloom sphere
+        this.createExplosionFlash(position);
+
         // Fire/plasma particles
         const particleCount = 40;
         for (let i = 0; i < particleCount; i++) {
@@ -3081,6 +3133,7 @@ class StarTrekGame {
             // Dramatic shield flash effect
             this.showShieldHitEffect();
             this.playShieldHitSound();
+            this.triggerScreenShake(0.5, 200);
 
             // Check shield status for crew dialog
             this.checkShieldStatus();
@@ -3090,6 +3143,7 @@ class StarTrekGame {
         if (amount > 0) {
             this.stats.hull -= amount;
             this.playHullDamageSound();
+            this.triggerScreenShake(1.5, 400);
 
             // Damage overlay
             const overlay = document.getElementById('damageOverlay');
@@ -3300,41 +3354,7 @@ class StarTrekGame {
         if (this.phaserCooldown > 0) this.phaserCooldown -= deltaTime;
         if (this.torpedoCooldown > 0) this.torpedoCooldown -= deltaTime;
 
-        // WAR THUNDER STYLE MOUSE CONTROLS
-        // Ship smoothly flies toward where the mouse is pointing
-        if (this.mouseFlightEnabled && this.gameStarted && !this.autopilotEnabled) {
-            // Calculate target direction based on mouse position
-            // Mouse at center = fly straight, mouse offset = turn that direction
-            const mouseX = this.mouse.x; // -1 to 1
-            const mouseY = this.mouse.y; // -1 to 1
-
-            // Target yaw and pitch based on mouse position
-            // The ship tries to rotate so it's pointing where the mouse indicates
-            const targetYawOffset = -mouseX * 0.8; // How much to turn left/right
-            const targetPitchOffset = mouseY * 0.4; // How much to pitch up/down
-
-            // Smooth interpolation factor (higher = more responsive)
-            const smoothing = 0.04;
-
-            // Calculate desired rotation changes
-            const currentPitch = this.enterprise.rotation.x;
-            const desiredPitch = targetPitchOffset;
-
-            // Smoothly interpolate pitch
-            this.enterprise.rotation.x += (desiredPitch - currentPitch) * smoothing;
-            this.enterprise.rotation.x = Math.max(-0.6, Math.min(0.6, this.enterprise.rotation.x));
-
-            // Apply yaw based on mouse offset (the further from center, the faster the turn)
-            const yawRate = targetYawOffset * 0.03;
-            this.enterprise.rotation.y += yawRate;
-
-            // Auto-level roll smoothly
-            this.enterprise.rotation.z *= 0.95;
-
-            // Add slight roll when turning (like a real aircraft/ship)
-            this.enterprise.rotation.z -= mouseX * 0.01;
-            this.enterprise.rotation.z = Math.max(-0.3, Math.min(0.3, this.enterprise.rotation.z));
-        }
+        // WASD + Arrow key controls (mouse flight disabled)
 
         // Autopilot - automatically fly towards nearest enemy
         if (this.autopilotEnabled && this.targetLocked && this.gameStarted) {
@@ -3352,24 +3372,50 @@ class StarTrekGame {
             this.stats.speed = Math.min(this.stats.speed + 0.01, this.stats.maxSpeed * 0.7);
         }
 
-        const turnSpeed = this.stats.turnSpeed * deltaTime * 0.05;
+        const turnSpeed = this.stats.turnSpeed * deltaTime * 0.12;
 
-        // Keyboard controls still work for fine adjustments
+        // Keyboard flight controls
+        // A/D and Left/Right arrows = yaw (turn left/right)
         if (this.keys['a'] || this.keys['arrowleft']) this.enterprise.rotation.y += turnSpeed;
         if (this.keys['d'] || this.keys['arrowright']) this.enterprise.rotation.y -= turnSpeed;
-        if (this.keys['q']) this.enterprise.rotation.z += turnSpeed * 0.5;
-        if (this.keys['e']) this.enterprise.rotation.z -= turnSpeed * 0.5;
 
-        // Throttle (W/S and Up/Down arrows) - hold to accelerate/decelerate
-        if (this.keys['w'] || this.keys['arrowup']) {
-            this.stats.speed = Math.min(this.stats.speed + 0.03, this.stats.maxSpeed);
-        } else if (this.keys['s'] || this.keys['arrowdown']) {
-            this.stats.speed = Math.max(this.stats.speed - 0.03, 0);
+        // Up/Down arrows = pitch (nose up/down)
+        if (this.keys['arrowup']) {
+            this.enterprise.rotation.x += turnSpeed * 0.8;
+            this.enterprise.rotation.x = Math.min(0.8, this.enterprise.rotation.x);
+        }
+        if (this.keys['arrowdown']) {
+            this.enterprise.rotation.x -= turnSpeed * 0.8;
+            this.enterprise.rotation.x = Math.max(-0.8, this.enterprise.rotation.x);
         }
 
-        // Hold left mouse button to accelerate
-        if (this.mouse.down) {
-            this.stats.speed = Math.min(this.stats.speed + 0.015, this.stats.maxSpeed);
+        // Q/E = roll
+        if (this.keys['q']) this.enterprise.rotation.z += turnSpeed * 0.6;
+        if (this.keys['e']) this.enterprise.rotation.z -= turnSpeed * 0.6;
+
+        // Add slight roll when turning for feel
+        if (this.keys['a'] || this.keys['arrowleft']) {
+            this.enterprise.rotation.z = Math.min(this.enterprise.rotation.z + 0.003, 0.25);
+        } else if (this.keys['d'] || this.keys['arrowright']) {
+            this.enterprise.rotation.z = Math.max(this.enterprise.rotation.z - 0.003, -0.25);
+        }
+
+        // Auto-level pitch and roll when not pressing keys
+        if (!this.keys['arrowup'] && !this.keys['arrowdown']) {
+            this.enterprise.rotation.x *= 0.94;
+        }
+        if (!this.keys['q'] && !this.keys['e'] && !this.keys['a'] && !this.keys['d'] && !this.keys['arrowleft'] && !this.keys['arrowright']) {
+            this.enterprise.rotation.z *= 0.93;
+        }
+
+        // Throttle - W/S to accelerate/decelerate
+        if (this.keys['w']) {
+            this.stats.speed = Math.min(this.stats.speed + 0.05, this.stats.maxSpeed);
+        } else if (this.keys['s']) {
+            this.stats.speed = Math.max(this.stats.speed - 0.05, 0);
+        } else {
+            // Gentle speed decay when not pressing throttle
+            this.stats.speed *= 0.998;
         }
 
         // Warp
@@ -3394,6 +3440,10 @@ class StarTrekGame {
         // Ship light
         this.shipLight.position.copy(this.enterprise.position);
         this.shipLight.position.y += 10;
+
+        // Sun follows player so shadows stay relevant
+        this.sunLight.position.copy(this.enterprise.position).add(new THREE.Vector3(100, 80, 100));
+        this.sunLight.target.position.copy(this.enterprise.position);
 
         // Visual effects
         const time = Date.now();
@@ -3761,6 +3811,240 @@ class StarTrekGame {
         this.scene.add(proj);
     }
 
+    // ============================================
+    // VISUAL EFFECTS
+    // ============================================
+
+    enableShadows(group) {
+        group.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }
+
+    triggerScreenShake(intensity, duration) {
+        if (intensity > this.screenShake.intensity) {
+            this.screenShake.intensity = intensity;
+            this.screenShake.duration = duration;
+            this.screenShake.elapsed = 0;
+            this.screenShake.active = true;
+        }
+    }
+
+    updateScreenShake(deltaTime) {
+        if (!this.screenShake.active) return;
+
+        this.screenShake.elapsed += deltaTime;
+        if (this.screenShake.elapsed >= this.screenShake.duration) {
+            this.screenShake.active = false;
+            return;
+        }
+
+        const progress = this.screenShake.elapsed / this.screenShake.duration;
+        const decay = 1 - progress * progress; // quadratic decay
+        const shake = this.screenShake.intensity * decay;
+
+        this.camera.position.x += (Math.random() - 0.5) * shake;
+        this.camera.position.y += (Math.random() - 0.5) * shake;
+        this.camera.position.z += (Math.random() - 0.5) * shake * 0.5;
+    }
+
+    createExplosionFlash(position) {
+        // PointLight flash
+        const light = new THREE.PointLight(0xffaa44, 8, 200);
+        light.position.copy(position);
+        this.scene.add(light);
+
+        // Bright bloom sphere
+        const flashGeom = new THREE.SphereGeometry(3, 12, 12);
+        const flashMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 1
+        });
+        const flash = new THREE.Mesh(flashGeom, flashMat);
+        flash.position.copy(position);
+        this.scene.add(flash);
+
+        const flashData = { light, flash, elapsed: 0, duration: 400 };
+        this.explosionFlashes.push(flashData);
+
+        // Trigger screen shake if near player
+        const dist = this.enterprise.position.distanceTo(position);
+        if (dist < 200) {
+            const shakeIntensity = Math.max(0.5, 3 * (1 - dist / 200));
+            this.triggerScreenShake(shakeIntensity, 300);
+        }
+    }
+
+    updateExplosionFlashes(deltaTime) {
+        this.explosionFlashes = this.explosionFlashes.filter(f => {
+            f.elapsed += deltaTime;
+            const progress = f.elapsed / f.duration;
+
+            if (progress >= 1) {
+                this.scene.remove(f.light);
+                this.scene.remove(f.flash);
+                f.flash.geometry.dispose();
+                f.flash.material.dispose();
+                return false;
+            }
+
+            // Light fades out
+            f.light.intensity = 8 * (1 - progress);
+            // Sphere expands and fades
+            const scale = 1 + progress * 4;
+            f.flash.scale.set(scale, scale, scale);
+            f.flash.material.opacity = 1 - progress;
+
+            return true;
+        });
+    }
+
+    createWarpLines() {
+        this.warpLineGroup = new THREE.Group();
+        const lineCount = 200;
+
+        for (let i = 0; i < lineCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 20 + Math.random() * 80;
+            const y = (Math.random() - 0.5) * 60;
+
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+
+            const points = [
+                new THREE.Vector3(x, y, z),
+                new THREE.Vector3(x, y, z + 0.1) // starts as a dot
+            ];
+
+            const geom = new THREE.BufferGeometry().setFromPoints(points);
+            const mat = new THREE.LineBasicMaterial({
+                color: 0xaaccff,
+                transparent: true,
+                opacity: 0,
+                blending: THREE.AdditiveBlending
+            });
+
+            const line = new THREE.Line(geom, mat);
+            line.userData = {
+                baseX: x, baseY: y, baseZ: z,
+                angle, radius
+            };
+            this.warpLineGroup.add(line);
+        }
+
+        this.scene.add(this.warpLineGroup);
+        this.warpLines = this.warpLineGroup;
+    }
+
+    updateWarpLines(deltaTime) {
+        if (!this.warpLines) return;
+
+        const warpActive = this.stats.warpSpeed > 0;
+        const targetOpacity = warpActive ? 0.7 : 0;
+
+        // Smooth transition
+        this.warpLinesOpacity += (targetOpacity - this.warpLinesOpacity) * 0.05;
+
+        // Fade starfield during warp
+        if (this.starfield && this.starfield.material) {
+            const starTarget = warpActive ? 0.3 : 0.9;
+            this.starfield.material.opacity += (starTarget - this.starfield.material.opacity) * 0.05;
+        }
+
+        // Position warp lines around player
+        this.warpLines.position.copy(this.enterprise.position);
+        this.warpLines.quaternion.copy(this.enterprise.quaternion);
+
+        const warpFactor = Math.min(this.stats.warpSpeed / this.stats.maxWarp, 1);
+        const streakLength = warpFactor * 40;
+
+        this.warpLines.children.forEach(line => {
+            const d = line.userData;
+            const positions = line.geometry.attributes.position.array;
+
+            // Start point stays at base
+            positions[0] = d.baseX;
+            positions[1] = d.baseY;
+            positions[2] = d.baseZ;
+
+            // End point stretches backward (positive Z = behind ship)
+            positions[3] = d.baseX;
+            positions[4] = d.baseY;
+            positions[5] = d.baseZ + streakLength;
+
+            line.geometry.attributes.position.needsUpdate = true;
+            line.material.opacity = this.warpLinesOpacity;
+        });
+    }
+
+    updateEngineTrails(deltaTime) {
+        const totalSpeed = this.stats.speed + this.stats.warpSpeed * 5;
+        const warpActive = this.stats.warpSpeed > 0;
+
+        // Emit particles from nacelle rear ends
+        if (totalSpeed > 0.1 && this.enterprise) {
+            // Nacelle positions in local space (rear ends)
+            // Nacelles are at x=+/-14, y=8, z=18 in local, plus nacelleLength/2 = 22 for rear
+            const nacelleRearPositions = [
+                new THREE.Vector3(-14 * 0.32, 8 * 0.32, 40 * 0.32),  // port nacelle rear
+                new THREE.Vector3(14 * 0.32, 8 * 0.32, 40 * 0.32)    // starboard nacelle rear
+            ];
+
+            const emitChance = Math.min(totalSpeed / 2, 1);
+            if (Math.random() < emitChance) {
+                nacelleRearPositions.forEach(localPos => {
+                    const worldPos = localPos.clone().applyMatrix4(this.enterprise.matrixWorld);
+
+                    const geom = new THREE.SphereGeometry(0.3 + Math.random() * 0.2, 4, 4);
+                    const color = warpActive ? 0x66bbff : 0x4488ff;
+                    const mat = new THREE.MeshBasicMaterial({
+                        color: color,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const particle = new THREE.Mesh(geom, mat);
+                    particle.position.copy(worldPos);
+
+                    // Slight random spread
+                    particle.position.x += (Math.random() - 0.5) * 0.3;
+                    particle.position.y += (Math.random() - 0.5) * 0.3;
+
+                    particle.userData = {
+                        life: 300,
+                        maxLife: 300,
+                        type: 'engineTrail'
+                    };
+
+                    this.engineTrails.push(particle);
+                    this.scene.add(particle);
+                });
+            }
+        }
+
+        // Update existing trail particles
+        this.engineTrails = this.engineTrails.filter(p => {
+            p.userData.life -= deltaTime;
+
+            if (p.userData.life <= 0) {
+                this.scene.remove(p);
+                p.geometry.dispose();
+                p.material.dispose();
+                return false;
+            }
+
+            const lifeRatio = p.userData.life / p.userData.maxLife;
+            p.material.opacity = lifeRatio * 0.8;
+            const scale = lifeRatio;
+            p.scale.set(scale, scale, scale);
+
+            return true;
+        });
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
 
@@ -3769,7 +4053,14 @@ class StarTrekGame {
         this.lastTime = now;
 
         this.update(deltaTime);
-        this.renderer.render(this.scene, this.camera);
+
+        // Update visual effects
+        this.updateScreenShake(deltaTime);
+        this.updateExplosionFlashes(deltaTime);
+        this.updateEngineTrails(deltaTime);
+        this.updateWarpLines(deltaTime);
+
+        this.composer.render();
     }
 }
 
