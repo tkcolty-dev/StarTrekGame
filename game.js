@@ -13,8 +13,8 @@ class StarTrekGame {
         this.particles = [];
 
         this.stats = {
-            hull: 100, maxHull: 100,
-            shields: 100, maxShields: 100,
+            hull: 500, maxHull: 500,
+            shields: 200, maxShields: 200,
             energy: 100, maxEnergy: 100,
             phaserCharge: 100,
             torpedoes: 72, maxTorpedoes: 72,
@@ -55,8 +55,8 @@ class StarTrekGame {
         this.isRepairing = false;
 
         this.upgrades = {
-            hullPlating: { name: 'Reinforced Hull', desc: '+50 Max Hull', cost: 500, purchased: false, effect: () => { this.stats.maxHull += 50; this.stats.hull = this.stats.maxHull; }},
-            shieldBoost: { name: 'Enhanced Shields', desc: '+50 Max Shields', cost: 500, purchased: false, effect: () => { this.stats.maxShields += 50; this.stats.shields = this.stats.maxShields; }},
+            hullPlating: { name: 'Reinforced Hull', desc: '+100 Max Hull', cost: 500, purchased: false, effect: () => { this.stats.maxHull += 100; this.stats.hull = this.stats.maxHull; }},
+            shieldBoost: { name: 'Enhanced Shields', desc: '+100 Max Shields', cost: 500, purchased: false, effect: () => { this.stats.maxShields += 100; this.stats.shields = this.stats.maxShields; }},
             phaserUpgrade: { name: 'Phaser Overcharge', desc: '+15 Phaser Damage', cost: 750, purchased: false, effect: () => { this.stats.phaserDamage += 15; }},
             torpedoUpgrade: { name: 'Quantum Torpedoes', desc: '+50 Torpedo Damage', cost: 1000, purchased: false, effect: () => { this.stats.torpedoDamage += 50; }},
             extraTorpedoes: { name: 'Torpedo Bay', desc: '+5 Max Torpedoes', cost: 400, purchased: false, effect: () => { this.stats.maxTorpedoes += 5; this.stats.torpedoes = this.stats.maxTorpedoes; }},
@@ -2482,7 +2482,7 @@ class StarTrekGame {
 
         // Also repair hull slowly
         if (this.stats.hull < this.stats.maxHull) {
-            this.stats.hull = Math.min(this.stats.maxHull, this.stats.hull + 0.02);
+            this.stats.hull = Math.min(this.stats.maxHull, this.stats.hull + 0.1);
             repaired = true;
         }
 
@@ -3163,8 +3163,10 @@ class StarTrekGame {
             this.checkShieldStatus();
         }
 
-        // Hull damage when shields are down or depleted
+        // Hull damage when shields are down or depleted - cap damage per hit
         if (amount > 0) {
+            const maxHullDamagePerHit = this.stats.maxHull * 0.04;
+            amount = Math.min(amount, maxHullDamagePerHit);
             this.stats.hull -= amount;
             this.playHullDamageSound();
             this.triggerScreenShake(1.5, 400);
